@@ -7,11 +7,46 @@ from django.shortcuts import render_to_response
 from django.contrib import admin
 from django import forms
 from django.db.models import Q
+from django.conf import settings
 from filer.admin.permissions import PrimitivePermissionAwareModelAdmin
 from filer.models import Folder, FolderRoot, UnfiledImages, ImagesWithMissingData, File
 from filer.admin.tools import *
 from filer.models import tools
 from filer.settings import FILER_MEDIA_PREFIX
+ADMIN_MEDIA_PREFIX = settings.ADMIN_MEDIA_PREFIX
+
+from django.http import HttpResponse, HttpResponseNotFound
+from django.utils import simplejson
+from pprint import pprint
+def build_file_dict(file):
+    file = file.subtype()
+    r = {}
+    #{ title : "Node title", icon : "path_to/icon.pic", attributes : {"key" : "value" } }
+    pprint (file.icons)
+    r['data'] = { 'title' : unicode(file.label), 'icon' : file.icons.get('16', '')}
+    r['attributes'] = {'id': file.id }
+    return r
+
+def build_folder_dict(folder, max_depth=None, depth=0):
+    r = {}
+    r['data'] = unicode(folder)
+    r['attributes'] = {'id': folder.id }
+    children = folder.children.all()
+    #print "handling '%s' children: %s depth: %s max_depth: %s" % (folder, len(children), depth, max_depth)
+    r['children'] = []
+    if len(children):
+        if max_depth is None or max_depth>depth:
+            for child in children:
+                r['children'].append(build_folder_dict(child, max_depth=max_depth, depth=depth+1))
+        else:
+            r['state'] = 'closed'
+    files = folder.files
+    if len(files):
+        for file in folder.files:
+            r['children'].append(build_file_dict(file))
+    if not len(r['children']):
+        del r['children']
+    return r
 
 
 # Forms
@@ -31,6 +66,35 @@ class FolderAdmin(PrimitivePermissionAwareModelAdmin):
     raw_id_fields = ('owner',)
     save_as=True # see ImageAdmin
     #hide_in_app_index = True # custom var handled in app_index.html of image_filer
+    
+    def changelist_view(self, request, extra_context=None):
+        print "CHANGELIST VIEW!"
+        return super(FolderAdmin, self).changelist_view(request, extra_context)
+    
+    def ajax_folder(self, request, extra_context=None):
+        structured_data = []
+        print request
+        folder_id = request.REQUEST.get('id', None)
+        if folder_id is None:
+            return HttpResponse(simplejson.dumps([]),mimetype='application/json')
+        folder = Folder.objects.get(pk=folder_id)
+        for child in folder.children.all():
+            structured_data.append(build_folder_dict(child, max_depth=0))
+        
+        return HttpResponse(simplejson.dumps(structured_data),mimetype='application/json')
+    
+    def directory_browser_view(self, request, extra_context=None):
+        folders = Folder.objects.filter(parent=None).order_by('name')
+        print folders
+        structured_data = []
+        for child in folders:
+            structured_data.append(build_folder_dict(child, max_depth=1))
+        print structured_data
+        folders_json = simplejson.dumps(structured_data)
+        return render_to_response('admin/filer/folder/jstree/browser.html', {
+                'folders_json':folders_json,
+            }, context_instance=RequestContext(request))
+    
     
     def get_form(self, request, obj=None, **kwargs):
         """
@@ -117,6 +181,9 @@ class FolderAdmin(PrimitivePermissionAwareModelAdmin):
             # we override the default list view with our own directory listing of the root directories
             url(r'^$', self.admin_site.admin_view(self.directory_listing), name='filer-directory_listing-root'),
             url(r'^(?P<folder_id>\d+)/list/$', self.admin_site.admin_view(self.directory_listing), name='filer-directory_listing'),
+            
+            url(r'^jstree/$', self.admin_site.admin_view(self.directory_browser_view), name='filer-directory_browser'),
+            url(r'^jstree/getchildren/$', self.admin_site.admin_view(self.ajax_folder), name='filer-directory_browser-getchildren'),
             
             url(r'^(?P<folder_id>\d+)/make_folder/$', self.admin_site.admin_view(views.make_folder), name='filer-directory_listing-make_folder'),
             url(r'^make_folder/$', self.admin_site.admin_view(views.make_folder), name='filer-directory_listing-make_root_folder'),

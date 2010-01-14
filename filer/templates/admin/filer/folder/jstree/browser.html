@@ -1,0 +1,84 @@
+{% extends "admin/filer/base_site.html" %}
+{% load i18n %}
+{% load adminmedia filermedia %}
+
+{% block extrahead %}{{ block.super }}
+<!-- this is end of super -->
+
+<script type="text/javascript" src="{% admin_media_prefix %}js/admin/RelatedObjectLookups.js"></script>
+<script type="text/javascript" src="{% filer_media_prefix %}js/popup_handling.js"></script>
+
+{# upload stuff #}
+<script type="text/javascript" src="{% filer_media_prefix %}js/jquery-1.3.2.min.js"></script>
+<script type="text/javascript" src="{% filer_media_prefix %}lib/jsTree/jquery.tree.js"></script>
+
+{% endblock %}
+
+{% block coltype %}colMS{% endblock %}
+{% block bodyclass %}change-list filebrowser{% endblock %}
+
+
+{% block extrastyle %}{{ block.super }}
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+	<a href="/admin/">Home</a> › <a href="/admin/filer/">Filer</a>
+</div>
+{% endblock %}
+
+
+{% block sidebar %}
+{% endblock %}
+
+
+{% block content_title %}<h1>Hi there</h1>
+{% endblock %}
+{% block content %}
+<div id="content-main">
+	<ul class="object-tools">
+		<li><a id="id_new_folder" href="#" class="addlink">{% trans "Do something" %}</a></li>
+    </ul>
+	
+    <div class="module" id="changelist">		
+		<script type="text/javascript" class="source">
+		var stat = {{ folders_json|safe }};
+		$(function () { 
+			$("#sa_json_1").tree({
+				data : { 
+					type : "json",
+					async : true,
+					opts : {
+						method : "GET",
+						url : "/admin/filer/folder/jstree/getchildren/"
+					}
+				},
+				callback : { 
+					// Take care of refresh calls - n will be false only when the whole tree is refreshed or loaded of the first time
+					// Make sure static is not used once the tree has loaded for the first time
+					beforedata : function (n, t) { 
+						if(n == false) {
+							t.settings.data.opts.static = stat;
+						} else { 
+							t.settings.data.opts.static = false;
+							console.log(n);
+							return { id : $(n).attr("id") || 0 } 
+						}
+					}
+				},
+				ui : {
+					theme_name : "apple",
+					dots: false
+				}
+			});
+		});
+		</script>
+		<div class="demo" id="sa_json_1"></div>
+		<pre>
+			{{ folders_json }}
+		</pre>
+		<div style="clear:both;"></div>
+    </div>
+</div>
+
+{% endblock %}

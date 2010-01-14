@@ -6,5 +6,5 @@ FILER_MEDIA_PREFIX = getattr(settings, 'FILER_MEDIA_PREFIX', join(settings.MEDIA
 FILER_UPLOAD_ROOT = getattr(settings,'FILER_UPLOAD_ROOT', 'catalogue')
 
 FILER_ADMIN_ICON_SIZES = (
-        '32','48','64',
+        '16', '32','48','64',
 )

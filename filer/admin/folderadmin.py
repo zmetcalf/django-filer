@@ -110,7 +110,10 @@ class FolderAdmin(PrimitivePermissionAwareModelAdmin):
             build_folder_dict(ImagesWithMissingData(), include_files=False, hint_children=False, max_depth=0)
         ]
         special_folders_category = build_category_node("SPECIAL FOLDERS", "specialCategory", special_folders)
-        favorites_category = build_category_node("FAVORITES", "favoritesCategory", root_folders)
+        favorite_folders = []
+        for folder in Folder.objects.filter(favoritefolder__user=request.user).order_by('name'):
+            favorite_folders.append(build_folder_dict(folder, include_files=False, max_depth=0, hint_children=False))
+        favorites_category = build_category_node("FAVORITES", "favoritesCategory", favorite_folders)
         categories_data = [root_folders_category, special_folders_category, favorites_category]
         
         folders_data = []

@@ -17,3 +17,5 @@ admin.site.register(Clipboard, ClipboardAdmin)
 
 from filer.admin.imageadmin import ImageAdmin
 admin.site.register(Image, ImageAdmin)
+
+admin.site.register(FavoriteFolder)

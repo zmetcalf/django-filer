@@ -11,6 +11,7 @@ class DummyFolder(mixins.IconsMixin):
     can_have_subfolders = False
     parent = None
     _icon = "plainfolder"
+    id="none"
     @property
     def virtual_folders(self):
         return []
@@ -24,12 +25,15 @@ class DummyFolder(mixins.IconsMixin):
     @property
     def image_files(self):
         return self.files
+    def __unicode__(self):
+        return unicode(self.name)
 
 
 class UnfiledImages(DummyFolder):
     name = _("unfiled files")
     is_root = True
     _icon = "unfiled_folder"
+    id="unfiled_files"
     def _files(self):
         return File.objects.filter(folder__isnull=True)
     files = property(_files)
@@ -40,6 +44,7 @@ class ImagesWithMissingData(DummyFolder):
     name = _("files with missing metadata")
     is_root = True
     _icon = "incomplete_metadata_folder"
+    id="images_with_missing_data"
     @property
     def files(self):
         return File.objects.filter(has_all_mandatory_data=False)
@@ -51,6 +56,7 @@ class FolderRoot(DummyFolder):
     is_root = True
     is_smart_folder = False
     can_have_subfolders = True
+    id="root"
     @property
     def virtual_folders(self):
         return [UnfiledImages(), ]# ImagesWithMissingData()]

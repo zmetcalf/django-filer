@@ -14,7 +14,7 @@
 
 {% endblock %}
 
-{% block coltype %}colMS{% endblock %}
+{# {% block coltype %}colMS{% endblock %} #}
 {% block bodyclass %}change-list filebrowser{% endblock %}
 
 
@@ -35,16 +35,54 @@
 {% block content_title %}<h1>Hi there</h1>
 {% endblock %}
 {% block content %}
+<style type="text/css">
+	/* special hidden icons for categories (and no spacing for children) */
+	.tree a.noicon ins { display: none; }
+	.tree a.noicon { color: #666666; }
+	.tree li.noicon>ul { margin-left:0; } 
+	.tree li.noicon>ul>li.leaf { padding-left:0; }
+	
+	/* the trees */
+	.category_tree {
+		width: auto;
+		min-width: 200px;
+		border-right: 1px solid #CCCCCC;
+		float:left;
+		background-color: #EDF3FE;
+		
+		padding: 3px;
+	}
+	.folder_tree {
+		width: auto;
+		min-width: 300px;
+		border-right: 1px solid #CCCCCC;
+		float:left;
+		
+		padding: 3px;
+	}
+	.file_tree {
+		width: auto;
+		border-right: 1px solid #CCCCCC;
+		float:left;
+	}
+	
+	/* django style coloring */
+	.tree-apple li a.clicked, 
+	.tree-apple li a.clicked:hover, 
+	.tree-apple li span.clicked {
+		background-color: #7CA0C7;
+		border-color: #7CA0C7;
+	}
+</style>
+
 <div id="content-main">
 	<ul class="object-tools">
 		<li><a id="id_new_folder" href="#" class="addlink">{% trans "Do something" %}</a></li>
     </ul>
 	
-    <div class="module" id="changelist">		
+    <div class="module" id="changelist">	
 		<script type="text/javascript" class="source">
-		var stat = {{ folders_json|safe }};
-		$(function () { 
-			$("#sa_json_1").tree({
+		var default_tree_options = {
 				data : { 
 					type : "json",
 					async : true,
@@ -54,31 +92,67 @@
 					}
 				},
 				callback : { 
-					// Take care of refresh calls - n will be false only when the whole tree is refreshed or loaded of the first time
-					// Make sure static is not used once the tree has loaded for the first time
-					beforedata : function (n, t) { 
-						if(n == false) {
-							t.settings.data.opts.static = stat;
-						} else { 
-							t.settings.data.opts.static = false;
-							console.log(n);
-							return { id : $(n).attr("id") || 0 } 
-						}
-					}
 				},
 				ui : {
 					theme_name : "apple",
 					dots: false
 				}
-			});
+			};
+		function build_tree_options_for_initial_data(initial_data) {
+			var initial_options = default_tree_options
+			var the_beforedata_callback = function (n, t) { 
+				// Take care of refresh calls - n will be false only when the whole tree is refreshed or loaded of the first time
+				// Make sure static is not used once the tree has loaded for the first time
+				if(n == false) {
+					t.settings.data.opts.static = initial_data;
+				} else { 
+					t.settings.data.opts.static = false;
+					return { id : $(n).attr("id") || 0 };
+				}
+			}
+			var new_options = initial_options
+			new_options.callback.beforedata = the_beforedata_callback;
+			return new_options;
+		};
+		//console.log(build_tree_options_for_initial_data(categories_data));
+		$(function () { 
+			var categories_data = {{ categories_json|safe }};
+			var categories_options = build_tree_options_for_initial_data(categories_data);
+			categories_options.callback.onchange = function(node, tree_obj){
+				var folder_id = $(node).attr('id');
+				var the_data_callback = function(data, textStatus) {
+					$("#sa_json_2").tree(build_tree_options_for_initial_data(data));
+				};
+				$.getJSON("/admin/filer/folder/jstree/getchildren/",{'id':folder_id},the_data_callback)
+				//var folder_id = node.attr('id');
+				//alert(folder_id);
+				//$('#sa_json_2').tree()
+			}
+			$("#sa_json_1").tree(categories_options);
 		});
 		</script>
-		<div class="demo" id="sa_json_1"></div>
-		<pre>
-			{{ folders_json }}
-		</pre>
+		<div class="category_tree" id="sa_json_1" style=""></div>
+	
+	
+	
+	
+	
+		
+		<script type="text/javascript" class="source">
+		$(function () { 
+			var folders_data = {{ folders_json|safe }};
+			var folders_options = build_tree_options_for_initial_data(folders_data);
+			folders_options.callback.onchange = function(){
+				//console.log('focus changed');
+			}
+			$("#sa_json_2").tree(folders_options);
+		});
+		</script>
+		<div class="folder_tree" id="sa_json_2" style=""></div>
 		<div style="clear:both;"></div>
     </div>
+<pre>{{ folders_dict|pprint }}</pre>
+<pre>{{ categories_dict|pprint }}</pre>
 </div>
 
 {% endblock %}

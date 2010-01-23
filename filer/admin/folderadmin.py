@@ -27,26 +27,41 @@ def build_file_dict(file):
     r['attributes'] = {'id': file.id }
     return r
 
-def build_folder_dict(folder, max_depth=None, depth=0):
+def build_folder_dict(folder, id_override=None, include_files=True, max_depth=None, hint_children=True, depth=0):
     r = {}
     r['data'] = unicode(folder)
-    r['attributes'] = {'id': folder.id }
+    if id_override is None:
+        r['attributes'] = {'id': folder.id }
+    else:
+        r['attributes'] = {'id': id_override }
     children = folder.children.all()
     #print "handling '%s' children: %s depth: %s max_depth: %s" % (folder, len(children), depth, max_depth)
     r['children'] = []
     if len(children):
         if max_depth is None or max_depth>depth:
+            print u"%s creating children for '%s' because %s is larger than %s" % (" "*depth, folder, max_depth, depth )
             for child in children:
-                r['children'].append(build_folder_dict(child, max_depth=max_depth, depth=depth+1))
+                r['children'].append(build_folder_dict(child, include_files=include_files, max_depth=max_depth, hint_children=hint_children, depth=depth+1))
         else:
-            r['state'] = 'closed'
-    files = folder.files
-    if len(files):
-        for file in folder.files:
-            r['children'].append(build_file_dict(file))
+            if hint_children:
+                r['state'] = 'closed'
+    if include_files:
+        files = folder.files
+        if len(files):
+            for file in folder.files:
+                r['children'].append(build_file_dict(file))
     if not len(r['children']):
         del r['children']
     return r
+
+def build_category_node(title,name,children):
+    return {"data":
+            {"title":title, 
+             "clickable":False,"renameable":False, "deleteable":False, "createable":False,"draggable":False,
+             "attributes":{"class":"noicon"}},
+             "state": "open", 
+             "attributes":{"id":name,"class":"noicon"}, "children":children
+            }
 
 
 # Forms
@@ -84,15 +99,29 @@ class FolderAdmin(PrimitivePermissionAwareModelAdmin):
         return HttpResponse(simplejson.dumps(structured_data),mimetype='application/json')
     
     def directory_browser_view(self, request, extra_context=None):
+        root_folders = []
         folders = Folder.objects.filter(parent=None).order_by('name')
-        print folders
-        structured_data = []
-        for child in folders:
-            structured_data.append(build_folder_dict(child, max_depth=1))
-        print structured_data
-        folders_json = simplejson.dumps(structured_data)
+        for folder in folders:
+            root_folders.append(build_folder_dict(folder, include_files=False, max_depth=0, hint_children=False))
+        root_folders_category = build_category_node("FOLDERS", "rootFoldersCategory", root_folders)
+        
+        special_folders = [
+            build_folder_dict(UnfiledImages(), include_files=False, hint_children=False, max_depth=0 ),
+            build_folder_dict(ImagesWithMissingData(), include_files=False, hint_children=False, max_depth=0)
+        ]
+        special_folders_category = build_category_node("SPECIAL FOLDERS", "specialCategory", special_folders)
+        favorites_category = build_category_node("FAVORITES", "favoritesCategory", root_folders)
+        categories_data = [root_folders_category, special_folders_category, favorites_category]
+        
+        folders_data = []
+        for child in folders[0].children.order_by('name'):
+            folders_data.append(build_folder_dict(child))
+        #print structured_data
         return render_to_response('admin/filer/folder/jstree/browser.html', {
-                'folders_json':folders_json,
+                'folders_json':simplejson.dumps(folders_data),
+                'folders_dict': folders_data,
+                'categories_json':simplejson.dumps(categories_data),
+                'categories_dict':categories_data,
             }, context_instance=RequestContext(request))
     
     

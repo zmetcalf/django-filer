@@ -120,10 +120,10 @@
 								},
 								async: true,
 								success: function(data, textStatus, request) {
-									alert('success: ' + textStatus + '   ' + data);
+									//alert('success: ' + textStatus + '   ' + data);
 								},
 								error: function(request, textStatus, errorThrown) {
-									alert('failed: ' + textStatus + '    ' + errorThrown);
+									//alert('failed: ' + textStatus + '    ' + errorThrown);
 									$.tree.rollback(rb);
 								}
 							}

@@ -4,6 +4,7 @@
 
 {% block extrahead %}{{ block.super }}
 <!-- this is end of super -->
+<link href="/media/admin/css/changelists.css" type="text/css" rel="stylesheet">
 
 <script type="text/javascript" src="{% admin_media_prefix %}js/admin/RelatedObjectLookups.js"></script>
 <script type="text/javascript" src="{% filer_media_prefix %}js/popup_handling.js"></script>
@@ -42,28 +43,37 @@
 	.tree li.noicon>ul { margin-left:0; } 
 	.tree li.noicon>ul>li.leaf { padding-left:0; }
 	
+	/* make the filebrowser fill the screen */
+	html,body {height:100%;}
+	#browser_container {height:300px}
+	#changelist {height: 100%;}
+	
+	/* fixes to re-use django styled stuff */
+	.toolbar {
+		padding: 3px;
+		border-top: 1px solid #CCCCCC;
+	}
+	.toolbar .object-tools {
+		padding: 0;
+		margin: 0;
+		float: none;
+	}
+	
 	/* the trees */
-	.category_tree {
+	#category_tree_container, #folder_tree_container {
+		height: 100%;
 		width: auto;
 		min-width: 200px;
 		border-right: 1px solid #CCCCCC;
 		float:left;
+		position: relative;
+		overflow-y: scroll;
+	}
+	#category_tree_container {
 		background-color: #EDF3FE;
-		
-		padding: 3px;
 	}
-	.folder_tree {
-		width: auto;
-		min-width: 300px;
-		border-right: 1px solid #CCCCCC;
-		float:left;
-		
+	.category_tree, .folder_tree {
 		padding: 3px;
-	}
-	.file_tree {
-		width: auto;
-		border-right: 1px solid #CCCCCC;
-		float:left;
 	}
 	
 	/* django style coloring */
@@ -80,79 +90,143 @@
 		<li><a id="id_new_folder" href="#" class="addlink">{% trans "Do something" %}</a></li>
     </ul>
 	
-    <div class="module" id="changelist">	
-		<script type="text/javascript" class="source">
-		var default_tree_options = {
-				data : { 
-					type : "json",
-					async : true,
-					opts : {
-						method : "GET",
-						url : "/admin/filer/folder/jstree/getchildren/"
+    <div class="module" id="changelist">
+    	<div id="toolbar">
+    		This is where the search stuff will be
+    	</div>
+		<div id="browser_container">
+			<script type="text/javascript" class="source">
+			var default_tree_options = {
+					data: { 
+						type : "json",
+						async : true,
+						opts : {
+							method : "GET",
+							url : "/admin/filer/folder/jstree/getchildren/"
+						}
+					},
+					callback: { 
+						onmove: function(node, ref_node, type, tree_obj, rb){
+							//alert("moving '" + tree_obj.get_text(node) + "' (" + rb + ") to '" + tree_obj.get_text(ref_node)+"'");
+							$.ajax({
+								type:'POST',
+								dataType: 'json',
+								url: '/admin/filer/folder/jstree/move/',
+								data: { 'src_objtype': tree_obj.get_type(node), 
+										'src_id': tree_obj.get_node(node).attr('id'),
+										'ref_objtype': tree_obj.get_type(ref_node),
+										'ref_id': tree_obj.get_node(ref_node).attr('id'),
+										'ref_type': type
+								},
+								async: true,
+								success: function(data, textStatus, request) {
+									alert('success: ' + textStatus + '   ' + data);
+								},
+								error: function(request, textStatus, errorThrown) {
+									alert('failed: ' + textStatus + '    ' + errorThrown);
+									$.tree.rollback(rb);
+								}
+							}
+							);
+						}
+					},
+					rules :{
+					},
+					types: {
+						"default": {
+							deletable: false,
+							renameable: false
+						},
+						"category": {
+							draggable: false,
+							deletable: false,
+							valid_children: ["folder"]
+						},
+						"category_item": {
+							
+						},
+						"folder": {
+							valid_children: ["file","folder"]
+						},
+						"file": {
+							valid_children: "none",
+							max_children: 0,
+							max_depth: 0,
+							icon: {
+								image: "/media/filer/icons/file_16x16.png"
+							}
+						}
+					},
+					ui: {
+						theme_name : "apple",
+						dots: false
 					}
-				},
-				callback : { 
-				},
-				ui : {
-					theme_name : "apple",
-					dots: false
-				}
-			};
-		function build_tree_options_for_initial_data(initial_data) {
-			var initial_options = default_tree_options
-			var the_beforedata_callback = function (n, t) { 
-				// Take care of refresh calls - n will be false only when the whole tree is refreshed or loaded of the first time
-				// Make sure static is not used once the tree has loaded for the first time
-				if(n == false) {
-					t.settings.data.opts.static = initial_data;
-				} else { 
-					t.settings.data.opts.static = false;
-					return { id : $(n).attr("id") || 0 };
-				}
-			}
-			var new_options = initial_options
-			new_options.callback.beforedata = the_beforedata_callback;
-			return new_options;
-		};
-		//console.log(build_tree_options_for_initial_data(categories_data));
-		$(function () { 
-			var categories_data = {{ categories_json|safe }};
-			var categories_options = build_tree_options_for_initial_data(categories_data);
-			categories_options.callback.onchange = function(node, tree_obj){
-				var folder_id = $(node).attr('id');
-				var the_data_callback = function(data, textStatus) {
-					$("#sa_json_2").tree(build_tree_options_for_initial_data(data));
 				};
-				$.getJSON("/admin/filer/folder/jstree/getchildren/",{'id':folder_id},the_data_callback)
-				//var folder_id = node.attr('id');
-				//alert(folder_id);
-				//$('#sa_json_2').tree()
-			}
-			$("#sa_json_1").tree(categories_options);
-		});
-		</script>
-		<div class="category_tree" id="sa_json_1" style=""></div>
-	
-	
-	
-	
-	
+			function build_tree_options_for_initial_data(initial_data) {
+				var initial_options = default_tree_options
+				var the_beforedata_callback = function (n, t) { 
+					// Take care of refresh calls - n will be false only when the whole tree is refreshed or loaded of the first time
+					// Make sure static is not used once the tree has loaded for the first time
+					if(n == false) {
+						t.settings.data.opts.static = initial_data;
+					} else { 
+						t.settings.data.opts.static = false;
+						return { id : $(n).attr("id") || 0 };
+					}
+				}
+				var new_options = initial_options
+				new_options.callback.beforedata = the_beforedata_callback;
+				return new_options;
+			};
+			//console.log(build_tree_options_for_initial_data(categories_data));
+			$(function () { 
+				var categories_data = {{ categories_json|safe }};
+				var categories_options = build_tree_options_for_initial_data(categories_data);
+				categories_options.callback.onchange = function(node, tree_obj){
+					var folder_id = $(node).attr('id');
+					var the_data_callback = function(data, textStatus) {
+						$("#folder_tree").tree(build_tree_options_for_initial_data(data));
+					};
+					$.getJSON("/admin/filer/folder/jstree/getchildren/",{'id':folder_id},the_data_callback)
+					//var folder_id = node.attr('id');
+					//alert(folder_id);
+					//$('#sa_json_2').tree()
+				};
+				categories_options.selected = '{{ categories_initial_selected }}';
+				$("#category_tree").tree(categories_options);
+			});
+			</script>
+			<div id="category_tree_container">
+				<div class="category_tree" id="category_tree" style=""></div>
+			</div>
 		
-		<script type="text/javascript" class="source">
-		$(function () { 
-			var folders_data = {{ folders_json|safe }};
-			var folders_options = build_tree_options_for_initial_data(folders_data);
-			folders_options.callback.onchange = function(){
-				//console.log('focus changed');
-			}
-			$("#sa_json_2").tree(folders_options);
-		});
-		</script>
-		<div class="folder_tree" id="sa_json_2" style=""></div>
-		<div style="clear:both;"></div>
+		
+		
+		
+			
+			<script type="text/javascript" class="source">
+			$(function () { 
+				var folders_data = {{ folders_json|safe }};
+				var folders_options = build_tree_options_for_initial_data(folders_data);
+				folders_options.callback.onchange = function(){
+					//console.log('focus changed');
+				}
+				$("#folder_tree").tree(folders_options);
+			});
+			</script>
+			<div id="folder_tree_container">
+				<div class="folder_tree" id="folder_tree" style=""></div>
+			</div>
+			<div style="clear:both;"></div>
+		</div>
+		<div id="browser_footer" class="toolbar">
+			<ul class="object-tools">
+				<li><a href="" class="addlink">add Folder</a></li>
+			</ul>
+			<div style="clear:both;"></div>
+		</div>
     </div>
-<pre>{{ folders_dict|pprint }}</pre>
-<pre>{{ categories_dict|pprint }}</pre>
+{# <pre>{{ folders_dict|pprint }}</pre><pre>{{ categories_dict|pprint }}</pre> #}
 </div>
 
 {% endblock %}

@@ -1,7 +1,7 @@
 from django.core.urlresolvers import reverse
 from django.utils.safestring import mark_safe
 from django.contrib.admin.util import unquote, flatten_fieldsets, get_deleted_objects, model_ngettext, model_format_dict
-from django.http import HttpResponseRedirect, Http404
+from django.http import HttpResponseRedirect, Http404, HttpResponseForbidden
 from django.template import RequestContext
 from django.shortcuts import render_to_response
 from django.contrib import admin
@@ -22,18 +22,18 @@ def build_file_dict(file):
     file = file.subtype()
     r = {}
     #{ title : "Node title", icon : "path_to/icon.pic", attributes : {"key" : "value" } }
-    pprint (file.icons)
+    #pprint (file.icons)
     r['data'] = { 'title' : unicode(file.label), 'icon' : file.icons.get('16', '')}
-    r['attributes'] = {'id': file.id }
+    r['attributes'] = {'id': file.id, "rel":"file" }
     return r
 
 def build_folder_dict(folder, id_override=None, include_files=True, max_depth=None, hint_children=True, depth=0):
     r = {}
     r['data'] = unicode(folder)
     if id_override is None:
-        r['attributes'] = {'id': folder.id }
+        r['attributes'] = {'id': folder.id, "rel":"folder" }
     else:
-        r['attributes'] = {'id': id_override }
+        r['attributes'] = {'id': id_override, "rel":"folder" }
     children = folder.children.all()
     #print "handling '%s' children: %s depth: %s max_depth: %s" % (folder, len(children), depth, max_depth)
     r['children'] = []
@@ -57,10 +57,15 @@ def build_folder_dict(folder, id_override=None, include_files=True, max_depth=No
 def build_category_node(title,name,children):
     return {"data":
             {"title":title, 
-             "clickable":False,"renameable":False, "deleteable":False, "createable":False,"draggable":False,
-             "attributes":{"class":"noicon"}},
+                 #"clickable":False,"renameable":False, "deleteable":False, "createable":False,"draggable":False,
+                 "attributes":{"class":"noicon"}
+             },
              "state": "open", 
-             "attributes":{"id":name,"class":"noicon"}, "children":children
+             "attributes":{"id":name,
+                           "class":"noicon",
+                           "rel":"category",
+                           }, 
+             "children":children,
             }
 
 
@@ -88,15 +93,76 @@ class FolderAdmin(PrimitivePermissionAwareModelAdmin):
     
     def ajax_folder(self, request, extra_context=None):
         structured_data = []
-        print request
         folder_id = request.REQUEST.get('id', None)
+        print folder_id
         if folder_id is None:
             return HttpResponse(simplejson.dumps([]),mimetype='application/json')
-        folder = Folder.objects.get(pk=folder_id)
-        for child in folder.children.all():
-            structured_data.append(build_folder_dict(child, max_depth=0))
-        
+        elif folder_id == UnfiledImages.id:
+            print 'unifiled'
+            data = build_folder_dict(UnfiledImages())
+        elif folder_id == ImagesWithMissingData.id:
+            print 'missing'
+            data = build_folder_dict(ImagesWithMissingData())
+        else:
+            print "normal id"
+            folder = Folder.objects.get(pk=folder_id)
+            data = build_folder_dict(folder, max_depth=1)
+        if 'children' in data:
+            structured_data = data['children']
+        else:
+            structured_data = []
         return HttpResponse(simplejson.dumps(structured_data),mimetype='application/json')
+    def ajax_move(self, request, extra_context=None):
+        #TODO: Permission checking!!!!!
+        #return HttpResponseForbidden('no way you can do that!')
+        try:
+            src_objtype = request.POST.get('src_objtype', None)
+            src_id = request.POST.get('src_id', None)
+            ref_objtype = request.POST.get('ref_objtype', None) 
+            ref_id = request.POST.get('ref_id', None) 
+            ref_type = request.POST.get('ref_type', None) 
+            print "src_type: %s src_id: %s ref_objtype: %s ref_id: %s ref_type: %s" % (src_objtype, src_id, ref_objtype, ref_id, ref_type)
+            if src_objtype in ['folder','file','category'] and src_id and ref_objtype and ref_id and ref_type:
+                if ref_objtype == 'folder':
+                    reference_obj = Folder.objects.get(id=ref_id)
+                    if ref_type in ['before','after']:
+                        # the destination obj is on the same level as reference_obj
+                        if reference_obj.parent:
+                            destination_obj = reference_obj.parent
+                        else:
+                            destination_obj = None
+                    else: #'inside'
+                        destination_obj = reference_obj
+                elif ref_objtype == 'file':
+                    reference_obj = File.objects.get(id=ref_id)
+                    if ref_type in ['before','after']:
+                        destination_obj = reference_obj.folder
+                    else:
+                        # this is illegal. a file cant have subitems!
+                        destination_obj = reference_obj.folder
+                
+                print u"got destination folder '%s'" % destination_obj
+                
+                if src_objtype == 'folder':
+                    src_folder = Folder.objects.get(id=src_id)
+                    src_folder.parent = destination_obj
+                    src_folder.save()
+                    print "moved folder"
+                elif src_objtype == 'file':
+                    src_file = File.objects.get(id=src_id)
+                    src_file.folder = destination_obj
+                    src_file.save()
+                    print "moved file"
+                elif src_objtype is 'category' and src_id is 'favorites':
+                    print "category type"
+                else:
+                    print "unknown type"
+            else:
+                print "somethign is wrong"
+        except Exception, e:
+            print e
+            HttpResponse(simplejson.dumps({'result':'failed'}),mimetype='application/json')
+        return HttpResponse(simplejson.dumps({'result':'ok'}),mimetype='application/json')
     
     def directory_browser_view(self, request, extra_context=None):
         root_folders = []
@@ -116,6 +182,7 @@ class FolderAdmin(PrimitivePermissionAwareModelAdmin):
         favorites_category = build_category_node("FAVORITES", "favoritesCategory", favorite_folders)
         categories_data = [root_folders_category, special_folders_category, favorites_category]
         
+        # TODO: catch if there are no root folders!
         folders_data = []
         for child in folders[0].children.order_by('name'):
             folders_data.append(build_folder_dict(child))
@@ -123,6 +190,7 @@ class FolderAdmin(PrimitivePermissionAwareModelAdmin):
         return render_to_response('admin/filer/folder/jstree/browser.html', {
                 'folders_json':simplejson.dumps(folders_data),
                 'folders_dict': folders_data,
+                'categories_initial_selected': folders[0].id,
                 'categories_json':simplejson.dumps(categories_data),
                 'categories_dict':categories_data,
             }, context_instance=RequestContext(request))
@@ -216,6 +284,7 @@ class FolderAdmin(PrimitivePermissionAwareModelAdmin):
             
             url(r'^jstree/$', self.admin_site.admin_view(self.directory_browser_view), name='filer-directory_browser'),
             url(r'^jstree/getchildren/$', self.admin_site.admin_view(self.ajax_folder), name='filer-directory_browser-getchildren'),
+            url(r'^jstree/move/$', self.admin_site.admin_view(self.ajax_move), name='filer-directory_browser-move'),
             
             url(r'^(?P<folder_id>\d+)/make_folder/$', self.admin_site.admin_view(views.make_folder), name='filer-directory_listing-make_folder'),
             url(r'^make_folder/$', self.admin_site.admin_view(views.make_folder), name='filer-directory_listing-make_root_folder'),

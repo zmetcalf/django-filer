@@ -12,12 +12,12 @@ from filer.admin.permissions import PrimitivePermissionAwareModelAdmin
 from filer.models import Folder, FolderRoot, UnfiledImages, ImagesWithMissingData, File
 from filer.admin.tools import *
 from filer.models import tools
-from filer.settings import FILER_MEDIA_PREFIX
-ADMIN_MEDIA_PREFIX = settings.ADMIN_MEDIA_PREFIX
+
+from filer.settings import FILER_STATICMEDIA_PREFIX
 
 from django.http import HttpResponse, HttpResponseNotFound
 from django.utils import simplejson
-from pprint import pprint
+
 def build_file_dict(file):
     file = file.subtype()
     r = {}
@@ -224,8 +224,8 @@ class FolderAdmin(PrimitivePermissionAwareModelAdmin):
         '''
         r = super(FolderAdmin, self).response_change(request, obj)
         if r['Location']:
-            print r['Location']
-            print obj
+            #print r['Location']
+            #print obj
             # it was a successful save
             if r['Location'] in ['../']:
                 if obj.parent:
@@ -270,7 +270,7 @@ class FolderAdmin(PrimitivePermissionAwareModelAdmin):
             return HttpResponseRedirect(url)
         return r
     def icon_img(self,xs):
-        return mark_safe('<img src="%simg/icons/plainfolder_32x32.png" alt="Folder Icon" />' % FILER_MEDIA_PREFIX)
+        return mark_safe('<img src="%simg/icons/plainfolder_32x32.png" alt="Folder Icon" />' % FILER_STATICMEDIA_PREFIX)
     icon_img.allow_tags = True
     
     def get_urls(self):

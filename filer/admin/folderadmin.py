@@ -68,7 +68,6 @@ def build_category_node(title,name,children):
              "children":children,
             }
 
-
 # Forms
 class AddFolderPopupForm(forms.ModelForm):
     folder = forms.HiddenInput()

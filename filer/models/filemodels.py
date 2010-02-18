@@ -16,7 +16,7 @@ class File(models.Model, mixins.IconsMixin):
     _file = models.FileField(upload_to=get_directory_name, null=True, blank=True, max_length=255)
     _file_type_plugin_name = models.CharField(_("file_type_plugin_name"), max_length=128, null=True, blank=True, editable=False)
     _file_size = models.IntegerField(null=True, blank=True)
-    
+    file_type = 'file'
     has_all_mandatory_data = models.BooleanField(default=False, editable=False)
     
     original_filename = models.CharField(max_length=255, blank=True, null=True)
@@ -39,6 +39,10 @@ class File(models.Model, mixins.IconsMixin):
     #usage_restriction_notes = models.TextField(null=True, blank=True)
     #notes = models.TextField(null=True, blank=True)
     #contact = models.ForeignKey(auth_models.User, related_name='contact_of_files', null=True, blank=True)
+    
+    @property
+    def node_type(self):
+        return self.subtype().file_type
     
     @property
     def label(self):

@@ -100,6 +100,11 @@ class Folder(models.Model, mixins.IconsMixin):
     objects = FolderManager()
     
     @property
+    def label(self):
+        return self.name
+    
+    # TODO: use annotate instead?
+    @property
     def file_count(self):
         if not hasattr(self, '_file_count_cache'):
             self._file_count_cache = self.files.count()

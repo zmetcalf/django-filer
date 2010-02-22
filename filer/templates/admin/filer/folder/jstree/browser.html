@@ -15,6 +15,7 @@
 <script type="text/javascript" src="{% filer_staticmedia_prefix %}lib/jsTree/jquery.tree.js"></script>
 <script type="text/javascript" src="{% filer_staticmedia_prefix %}lib/jsTree/plugins/jquery.tree.hotkeys.js"></script>
 <script type="text/javascript" src="{% filer_staticmedia_prefix %}lib/jsTree/plugins/jquery.tree.contextmenu.js"></script>
+{# <script type="text/javascript" src="{% filer_staticmedia_prefix %}js/filebrowser.js"></script> #}
 
 {% endblock %}
 
@@ -66,7 +67,7 @@
 	#category_tree_container, #folder_tree_container, #other_tree_container {
 		height: 100%;
 		width: auto;
-		min-width: 200px;
+		min-width: 230px;
 		border-right: 1px solid #CCCCCC;
 		float:left;
 		position: relative;
@@ -77,6 +78,22 @@
 	}
 	.category_tree, .folder_tree {
 		padding: 3px;
+	}
+	
+	/* make root folder special in folder view */
+	#folder_tree>ul {
+		margin-left: 0;
+		padding-left: 0;
+	}
+	#folder_tree>ul>li {
+		padding-left:0;
+		width: 100%;
+	}
+	#folder_tree>ul>li>a {
+		width: 100%;
+		background-color: #EDF3FE;
+		border-bottom: 1px solid #CCCCCC;
+		color: gray;
 	}
 	
 	/* django style coloring */
@@ -124,7 +141,8 @@ $(function () {
 		},
 		"folder": {
 			valid_children: ["file","folder"],
-			renameable: true
+			renameable: true,
+			deletable: true
 		},
 		"file": {
 			valid_children: "none",
@@ -133,13 +151,23 @@ $(function () {
 			icon: {
 				image: "/media/filer/icons/file_16x16.png"
 			},
-			renameable: true
+			renameable: true,
+			deletable: true
 		}
 	}
+	var rules = {
+		multitree:"all",
+		createat:"top",
+		use_max_children:true,
+		max_children:1
+	};
+	var tree_plugins = {
+		hotkeys: {}
+	};
 	var ui_options = {
-			theme_name : "apple",
-			dots: false
-		}
+		theme_name : "apple",
+		dots: false
+	};
 	
 	var ondata_handler = function(data, tree_obj) {
 		var model_to_jstree = function(v, no_state) {
@@ -224,18 +252,43 @@ $(function () {
 		};
 		return generated_function;
 	};
-	var onrename_handler = function(node, tree_obj, rb) {
+	
+	var savenode_handler = function(node, tree_obj, rb) {
 		var obj_type = tree_obj.get_type(node);
-		var obj_id = tree_obj.get_node(node).attr('id');
 		var theNode = tree_obj.get_node(node);
+		var obj_id = theNode.attr('id');
+		var parent = tree_obj.parent(node);
+		if (parent != -1) {
+			var has_parent = true;
+			var parent_obj_type = tree_obj.get_type(parent);
+		} else {
+			var has_parent = false;
+			var parent_obj_type = null;
+		};
+		var nodedata = { 'name': tree_obj.get_text(node) };
+		if (obj_type=='folder') {
+			if (has_parent) {
+				nodedata.parent = node_id2id(tree_obj.get_node(parent).attr('id'), parent_obj_type);
+			} else {
+				nodedata.parent = false;
+			};
+		};
+		if (obj_type=='file') {
+			if (has_parent) {
+				nodedata.folder = node_id2id(tree_obj.get_node(parent).attr('id'), parent_obj_type);
+			} else {
+				nodedata.folder = false;
+			};
+		}
+		
 		if (obj_id != "") {
-			// this is a rename
+			// this is a update
 			var url = "/admin/filer/folder/api/" + obj_type + "/" + node_id2id(obj_id, obj_type) + "/";
 			$.ajax({
 				type:'PUT',
 				//dataType: 'json',
 				url: url,
-				data: { 'name': tree_obj.get_text(node) },
+				data: nodedata,
 				async: true,
 				success: function(data, textStatus, request) {
 					//alert('success: ' + textStatus + '   ' + data);
@@ -248,21 +301,14 @@ $(function () {
 		} else {
 			// this is a create
 			var url = "/admin/filer/folder/api/" + obj_type + "/";
-			var data = {
-				'name': tree_obj.get_text(node)
-			};
-			var parent = tree_obj.parent(node);
-			if (parent != -1) {
-				data.parent = node_id2id(tree_obj.get_node(parent).attr('id'), obj_type);
-			};
 			$.ajax({
 				type:'POST',
 				dataType: 'json',
 				url: url,
-				data: data,
+				data: nodedata,
 				async: true,
 				success: function(xdata, textStatus) {
-					var node_id = id2node_id(xdata['id'], 'folder');
+					var node_id = id2node_id(xdata['id'], obj_type);
 					theNode.attr('id', node_id);
 					var theA = theNode.children('a:first');
 					var theINS = theNode.children('a:first').children('ins');
@@ -278,15 +324,50 @@ $(function () {
 		}
 		
 	};
+	var deletenode_handler = function(node, tree_obj, rb) {
+		var obj_type = tree_obj.get_type(node);
+		var theNode = tree_obj.get_node(node);
+		var obj_id = theNode.attr('id');
+		var nodedata = {};
+		var url = "/admin/filer/folder/api/" + obj_type + "/" + node_id2id(obj_id, obj_type) + "/";
+		$.ajax({
+			type:'DELETE',
+			//dataType: 'json',
+			url: url,
+			data: nodedata,
+			async: true,
+			success: function(data, textStatus, request) {
+				//alert('success: ' + textStatus + '   ' + data);
+			},
+			error: function(request, textStatus, errorThrown) {
+				//alert('failed: ' + textStatus + '    ' + errorThrown);
+				$.tree.rollback(rb);
+			}
+		});
+	};
+	
+	
 	var oncreate_handler = function(node, ref_node, type, tree_obj, rb) {
-		console.log("create");
+		//onsole.log("create");
 	};
 	var onmove_handler = function(node, ref_node, type, tree_obj, rb) {
-		console.log('move ' + node);
-	}
-	
+		//onsole.log('move ' + node);
+		return savenode_handler(node, tree_obj, rb);
+	};
+	var onrename_handler = function(node, tree_obj, rb) {
+		return savenode_handler(node, tree_obj, rb);
+	};
+	var ondelete_handler = function(node, tree_obj, rb) {
+		//onsole.log("delete");
+		return deletenode_handler(node, tree_obj, rb);
+	};
+	var onfocus_handler = function(tree_obj) {
+		console.log("focused: " + tree_obj.container.attr('id'));
+		tree_obj.focus();
+	};
 	
 	var update_folder_tree_callback = function(data, textStatus) {
+		var folderrules = $.extend({}, rules);
 		var folder_tree_options2 = {
 			data: {
 				type: 'json',
@@ -301,11 +382,18 @@ $(function () {
 				onrename: onrename_handler,
 				oncreate: oncreate_handler,
 				onmove: onmove_handler,
+				ondelete: ondelete_handler,
+				onfocus: onfocus_handler,
+				onchange: function(node, tree_obj) {
+					console.log('folders onchange before: ' + $.tree.focused().container.attr('id'));
+					tree_obj.focus();
+					console.log('folders onchange after: ' + $.tree.focused().container.attr('id'));
+				},
 				beforedata: function(n,t) {
 					if (n==false){
 						// the initial loading is done by selection in the categories tree
 						// so we can have initial data empty here
-						t.settings.data.opts.static = data;
+						t.settings.data.opts.static = [data];
 						//t.settings.data.opts.url
 						return {}
 					} else {
@@ -320,11 +408,18 @@ $(function () {
 				}
 			},
 			types: item_types,
+			rules: folderrules,
+			plugins: tree_plugins,
 			ui: ui_options
 		}
 		$("#folder_tree").tree(folder_tree_options2);
+		$.tree.focused().open_all();
+		//$.tree.focused().open_branch('#'+id2node_id(data['id'],'folder'));
+		//$.tree.focused().open_branch('#folder-1');
+		console.log('folders update: ' + $.tree.focused().container.attr('id'));
 	};
 	
+	var category_tree_rules = $.extend({}, rules);
 	var category_tree_options = {
 		data: {
 			type: 'json',
@@ -336,14 +431,24 @@ $(function () {
 		},
 		callback: {
 			ondata: ondata_handler,
+			onrename: onrename_handler,
+			oncreate: oncreate_handler,
+			onmove: onmove_handler,
+			ondelete: ondelete_handler,
+			onfocus: onfocus_handler,
 			onchange: function(node, tree_obj) {
 				// this updates the folder tree with the contents of the
 				// selected item in the item group tree
-				var folder_id = node_id2id($(node).attr('id'), 'folder');
-				$.getJSON("/admin/filer/folder/api/folder/" + folder_id + "/children/",{},update_folder_tree_callback);
+				var node_type = tree_obj.get_type(node);
+				var folder_id = node_id2id($(node).attr('id'), node_type);
+				//$.getJSON("/admin/filer/folder/api/folder/" + folder_id + "/children/",{},update_folder_tree_callback);
+				$.getJSON("/admin/filer/folder/api/folder/" + folder_id + "/",{},update_folder_tree_callback);
+				//onsole.log('categories onchange: ' + $.tree.focused().container.attr('id'));
 			}
 		},
 		types: item_types,
+		rules: category_tree_rules,
+		plugins: tree_plugins,
 		ui: ui_options
 	}
 	
@@ -362,9 +467,16 @@ $(function () {
 		</div>
 		<div id="browser_footer" class="toolbar">
 			<input type="button" onclick="var t = $.tree.focused(); if(t.selected) t.create(); else alert('Select a node first');" value="+ folder">
-			<input type="button" onclick="$.tree.focused().rename();" value="&uArr; upload">
-			<input type="button" onclick="$.tree.focused().rename();" value="- delete">
-			<input type="button" onclick="$.tree.focused().rename();" value="I rename">
+			<input type="button" onclick="" value="&uArr; upload">
+			&nbsp;&nbsp;&nbsp;
+			<input type="button" onclick="$.tree.focused().remove();" value="&ndash; delete">
+			&nbsp;&nbsp;&nbsp;
+			<input type="button" onclick="$.tree.focused().rename();" value="&lsaquo;|&rsaquo; rename">
+			
+			&nbsp;&nbsp;&nbsp;
+			<input type="button" onclick="console.log($.tree.focused().container.attr('id'));" value="who has focus?">
+			
+			
 			<div style="clear:both;"></div>
 		</div>
     </div>

@@ -54,6 +54,11 @@ class UnfiledImages(DummyFolder):
         return self.files
     def get_admin_directory_listing_url_path(self):
         return urlresolvers.reverse('admin:filer-directory_listing-unfiled_images')
+    def as_deep_dict(self):
+        d = self.as_dict()
+        d['children'] = self.files
+        return d
+    
     
 class ImagesWithMissingData(DummyFolder):
     name = _("files with missing metadata")
@@ -68,6 +73,11 @@ class ImagesWithMissingData(DummyFolder):
         return self.files
     def get_admin_directory_listing_url_path(self):
         return urlresolvers.reverse('admin:filer-directory_listing-images_with_missing_data')
+    def as_deep_dict(self):
+        d = self.as_dict()
+        d['children'] = self.files
+        return d
+    
 class FolderRoot(DummyFolder):
     name = 'Root'
     is_root = True

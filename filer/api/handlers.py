@@ -38,6 +38,55 @@ class NodeHandler(BaseHandler):
     @classmethod
     def icon(cls, obj):
         return obj.icons['16']
+    
+    def update(self, request, *args, **kwargs):
+        if not self.has_model():
+            return rc.NOT_IMPLEMENTED
+        pkfield = self.model._meta.pk.name
+
+        if pkfield not in kwargs:
+            # No pk was specified
+            return rc.BAD_REQUEST
+
+        try:
+            inst = self.queryset(request).get(pk=kwargs.get(pkfield))
+        except ObjectDoesNotExist:
+            return rc.NOT_FOUND
+        except MultipleObjectsReturned: # should never happen, since we're using a PK
+            return rc.BAD_REQUEST
+        attrs = self.flatten_dict(request.data)
+            
+        for k,v in attrs.iteritems():
+            if k == 'parent':
+                if v == 'favoritesCategory':
+                    # don't actually move the folder... just add a favorite
+                    new_favorite = models.FavoriteFolder(folder=inst, user=request.user)
+                    new_favorite.save()
+                else:
+                    try:
+                        parent_id = int(v)
+                        parent = models.Folder.objects.get(pk=parent_id)
+                    except:
+                        parent = None
+                    inst.parent = parent
+            elif k == 'folder':
+                try:
+                    folder_id = int(v)
+                    folder = models.Folder.objects.get(pk=folder_id)
+                except:
+                    folder = None
+                inst.folder = folder  
+            #elif k == 'name':
+            #    inst.name = self.find_free_folder_name(inst.parent, v)
+            else:
+                setattr( inst, k, v )
+        try:
+            inst.save()
+        except InvalidMove, e:
+            # mptt error e.g when there is a circular tree 
+            #traceback.print_exc(file=sys.stdout)
+            return rc.BAD_REQUEST
+        return rc.ALL_OK
 
 class FolderHandler(NodeHandler):
     allowed_methods = ('GET','PUT','POST','DELETE')
@@ -47,7 +96,7 @@ class FolderHandler(NodeHandler):
     def read(self, request, *args, **kwargs):
         if not self.has_model(): # we know this will never happen ;-)
             return rc.NOT_IMPLEMENTED
-        
+        user = request.user
         pkfield = self.model._meta.pk.name
         pk = kwargs.get(pkfield)
         filter_mode = kwargs.get('filter_mode', None)
@@ -65,7 +114,14 @@ class FolderHandler(NodeHandler):
                 return list(qs_folders) + list(qs_files)  
         if pkfield in kwargs:
             try:
-                return self.queryset(request).get(pk=kwargs.get(pkfield))
+                if pk == 'root':
+                    return ItemGroupHandler.item_groups(user)['rootFoldersCategory']
+                elif pk == 'unfiled_files':
+                    return models.UnfiledImages().as_deep_dict()
+                elif pk == 'images_with_missing_data':
+                    return models.ImagesWithMissingData().as_deep_dict()
+                else:
+                    return self.queryset(request).get(pk=kwargs.get(pkfield))
             except ObjectDoesNotExist:
                 return rc.NOT_FOUND
             except MultipleObjectsReturned: # should never happen, since we're using a PK
@@ -93,43 +149,6 @@ class FolderHandler(NodeHandler):
         inst.save()
         return inst
         
-    def update(self, request, *args, **kwargs):
-        if not self.has_model():
-            return rc.NOT_IMPLEMENTED
-        pkfield = self.model._meta.pk.name
-
-        if pkfield not in kwargs:
-            # No pk was specified
-            return rc.BAD_REQUEST
-
-        try:
-            inst = self.queryset(request).get(pk=kwargs.get(pkfield))
-        except ObjectDoesNotExist:
-            return rc.NOT_FOUND
-        except MultipleObjectsReturned: # should never happen, since we're using a PK
-            return rc.BAD_REQUEST
-        attrs = self.flatten_dict(request.data)
-            
-        for k,v in attrs.iteritems():
-            if k == 'parent':
-                try:
-                    parent_id = int(v)
-                    parent = models.Folder.objects.get(pk=parent_id)
-                except:
-                    parent = None
-                setattr(inst, k, parent)  
-            #elif k == 'name':
-            #    inst.name = self.find_free_folder_name(inst.parent, v)
-            else:
-                setattr( inst, k, v )
-        try:
-            inst.save()
-        except InvalidMove, e:
-            # mptt error e.g when there is a circular tree 
-            #traceback.print_exc(file=sys.stdout)
-            return rc.BAD_REQUEST
-        return rc.ALL_OK
-    
     def find_free_folder_name(self, parent, basename, number=0):
         if number:
             name = u"%s %s" % (basename, number)
@@ -148,6 +167,7 @@ class FileHandler(NodeHandler):
     @classmethod
     def icon(cls, obj):
         return obj.subtype().icons['16']
+        
 
 
 class ItemGroupHandler(NodeHandler):
@@ -155,45 +175,34 @@ class ItemGroupHandler(NodeHandler):
     fields = list(NodeHandler.fields) + ['children',]
     
     @classmethod
-    def _item_groups(cls, user):
-        ITEM_GROUPS = [
-            {
+    def item_groups(cls, user):
+        ITEM_GROUPS = {
+            'rootFoldersCategory':{
                 'id': 'rootFoldersCategory',
                 'node_type': 'category',
                 'name': 'FOLDERS',
                 'children': models.Folder.objects.filter(parent__isnull=True),
             },
-            {
+            'specialCategory':{
                 'id': 'specialCategory',
                 'node_type': 'category',
                 'name':'SPECIAL',
                 'children': [models.UnfiledImages().as_dict(), models.ImagesWithMissingData().as_dict()],
             },
-            {
+            'favoritesCategory':{
                 'id': 'favoritesCategory',
                 'node_type': 'category',
                 'name': 'FAVORITES',
                 'children': models.Folder.objects.filter(favoritefolder__user=user),
              },
-        ]
+        }
         return ITEM_GROUPS
-        
+    
     def read(self, request, *args, **kwargs):
         pk = kwargs.get('id', None)
         if pk:
-            for group in self._item_groups():
-                if group['id'] == pk:
-                    return group
+            if pk in self.item_groups(user=request.user).keys():
+                return self.item_groups(user=request.user)[pk]
             return rc.NOT_FOUND
         else:
-            return self._item_groups(user=request.user)
-        
-    '''
-    @classmethod
-    def id(cls, obj):
-        return ''
-    @classmethod
-    def name(cls, obj):
-        return ''
-    
-    '''
+            return self.item_groups(user=request.user).values()

@@ -96,6 +96,10 @@
 		color: gray;
 	}
 	
+	
+	/* search results */
+	.tree a.search { color:green !important; }
+	
 	/* django style coloring */
 	.tree-apple li a.clicked, 
 	.tree-apple li a.clicked:hover, 
@@ -365,6 +369,10 @@ $(function () {
 		console.log("focused: " + tree_obj.container.attr('id'));
 		tree_obj.focus();
 	};
+	var onsearch_handler = function(note, tree_obj) {
+		tree_obj.container.find('.search').removeClass('search');
+		
+	};
 	
 	var update_folder_tree_callback = function(data, textStatus) {
 		var folderrules = $.extend({}, rules);
@@ -476,7 +484,10 @@ $(function () {
 			&nbsp;&nbsp;&nbsp;
 			<input type="button" onclick="console.log($.tree.focused().container.attr('id'));" value="who has focus?">
 			
-			
+			<div style="float: right">
+				<input type="text" value="search">
+				<input type="button" onclick="$.tree.focused().search($(this).prev().val())" value="search">
+			</div>
 			<div style="clear:both;"></div>
 		</div>
     </div>

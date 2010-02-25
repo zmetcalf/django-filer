@@ -58,17 +58,15 @@ class NodeHandler(BaseHandler):
             
         for k,v in attrs.iteritems():
             if k == 'parent':
-                if v == 'favoritesCategory':
-                    # don't actually move the folder... just add a favorite
-                    new_favorite = models.FavoriteFolder(folder=inst, user=request.user)
-                    new_favorite.save()
+                if v==False:
+                    parent = None
                 else:
                     try:
                         parent_id = int(v)
                         parent = models.Folder.objects.get(pk=parent_id)
                     except:
                         parent = None
-                    inst.parent = parent
+                inst.parent = parent
             elif k == 'folder':
                 try:
                     folder_id = int(v)
@@ -91,7 +89,7 @@ class NodeHandler(BaseHandler):
 class FolderHandler(NodeHandler):
     allowed_methods = ('GET','PUT','POST','DELETE')
     model = models.Folder
-    fields = list(NodeHandler.fields) + ['has_children', 'children_count','file_count','item_count',]
+    fields = list(NodeHandler.fields) + ['has_children', 'children_count','file_count','item_count','created_at','modified_at','admin_change_url',]
     
     def read(self, request, *args, **kwargs):
         if not self.has_model(): # we know this will never happen ;-)
@@ -148,6 +146,10 @@ class FolderHandler(NodeHandler):
         inst = self.model(name=name,parent=parent)
         inst.save()
         return inst
+    
+    @classmethod
+    def admin_change_url(cls, obj):
+        return obj.get_admin_url_path()
         
     def find_free_folder_name(self, parent, basename, number=0):
         if number:
@@ -163,10 +165,22 @@ class FolderHandler(NodeHandler):
 class FileHandler(NodeHandler):
     allowed_methods = ('GET','PUT','POST','DELETE')
     model = models.File
+    fields = list(NodeHandler.fields) + ['created_at', 'modified_at','size','admin_change_url',]
     
     @classmethod
     def icon(cls, obj):
         return obj.subtype().icons['16']
+    
+    @classmethod
+    def icons(cls, obj):
+        return obj.subtype().icons
+    
+    @classmethod
+    def admin_change_url(cls, obj):
+        return obj.subtype().get_admin_url_path()
+    @classmethod
+    def created_at(cls, obj):
+        return obj.uploaded_at
         
 
 

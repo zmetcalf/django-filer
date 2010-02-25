@@ -33,5 +33,5 @@ FILER_PRIVATEMEDIA_PATH = getattr(settings,'FILER_PRIVATEMEDIA_PATH', '')
 '''
 
 FILER_ADMIN_ICON_SIZES = (
-        '16', '32','48','64',
+        '16', '32','48','64','128',
 )

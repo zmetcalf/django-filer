@@ -11,6 +11,7 @@
 
 {# upload stuff #}
 <script type="text/javascript" src="{% filer_staticmedia_prefix %}js/jquery-1.3.2.min.js"></script>
+<script type="text/javascript" src="{% filer_staticmedia_prefix %}js/jquery-ui-1.7.2.custom.min.js"></script>
 <script type="text/javascript" src="{% filer_staticmedia_prefix %}lib/jquery/extensions/jquery.hotkeys.js"></script>
 <script type="text/javascript" src="{% filer_staticmedia_prefix %}lib/jsTree/jquery.tree.js"></script>
 <script type="text/javascript" src="{% filer_staticmedia_prefix %}lib/jsTree/plugins/jquery.tree.hotkeys.js"></script>
@@ -49,7 +50,7 @@
 	
 	/* make the filebrowser fill the screen */
 	html,body {height:100%;}
-	#browser_container {height:300px}
+	#browser_container {height:400px;position:relative;}
 	#changelist {height: 100%;}
 	
 	/* fixes to re-use django styled stuff */
@@ -64,35 +65,54 @@
 	}
 	
 	/* the trees */
-	#category_tree_container, #folder_tree_container, #other_tree_container {
+	#category_tree_container, #folder_tree_container, #node_preview_container {
 		height: 100%;
-		width: auto;
 		min-width: 230px;
 		border-right: 1px solid #CCCCCC;
-		float:left;
 		position: relative;
 		overflow-y: scroll;
 	}
 	#category_tree_container {
 		background-color: #EDF3FE;
+		width: auto;
+		float: left;
+	}
+	#folder_tree_container {
+		width: auto;
+		float: left;
+	}
+	#node_preview_container {
+		width: 200px;
+		float: left;
+	}
+	#node_preview_container .node_preview .preview {
+		padding: 10px; 
+		text-align: center;
+	}
+	#node_preview_container .node_preview .preview img {
+		width: 190px;
 	}
 	.category_tree, .folder_tree {
 		padding: 3px;
 	}
 	
 	/* make root folder special in folder view */
+	#folder_tree {
+		padding: 0 0 0 0;
+	}
 	#folder_tree>ul {
 		margin-left: 0;
 		padding-left: 0;
 	}
 	#folder_tree>ul>li {
-		padding-left:0;
+		padding:0 0 0 0;
 		width: 100%;
 	}
-	#folder_tree>ul>li>a {
+	#folder_tree>ul>li>a,
+	#folder_tree>ul>li>a:hover {
 		width: 100%;
 		background-color: #EDF3FE;
-		border-bottom: 1px solid #CCCCCC;
+		/* border-bottom: 1px solid #CCCCCC; */
 		color: gray;
 	}
 	
@@ -139,7 +159,7 @@ $(function () {
 			draggable: false,
 			deletable: false,
 			renameable: false,
-			max_depth: 1,
+			//max_depth: 1,
 			valid_children: ["folder"],
 			clickable: false
 		},
@@ -166,7 +186,8 @@ $(function () {
 		max_children:1
 	};
 	var tree_plugins = {
-		hotkeys: {}
+		hotkeys: {},
+		//contextmenu: {}
 	};
 	var ui_options = {
 		theme_name : "apple",
@@ -256,16 +277,71 @@ $(function () {
 		};
 		return generated_function;
 	};
-	
+	var savedata_handler = function(nodedata, obj_type, obj_id, opts) {
+		var cfg = $.extend({
+				success_create:function(){console.log("default create success")},
+				error_create:function(){console.log('default create error')},
+				success_update:function(){console.log("default update success")},
+				error_update:function(){console.log('default update error')}
+			},opts);
+		if (obj_id != "") {
+			// this is a update
+			var url = "/admin/filer/folder/api/" + obj_type + "/" + node_id2id(obj_id, obj_type) + "/";
+			$.ajax({
+				type:'PUT',
+				//dataType: 'json',
+				url: url,
+				data: nodedata,
+				async: true,
+				success: cfg.success_update,
+				error: cfg.error_update,
+			});
+		} else {
+			// this is a create
+			var url = "/admin/filer/folder/api/" + obj_type + "/";
+			$.ajax({
+				type:'POST',
+				dataType: 'json',
+				url: url,
+				data: nodedata,
+				async: true,
+				success: cfg.success_create,
+				error: cfg.error_create
+			});
+			
+		};
+	};
 	var savenode_handler = function(node, tree_obj, rb) {
+		console.log("savenode_handler");
 		var obj_type = tree_obj.get_type(node);
 		var theNode = tree_obj.get_node(node);
 		var obj_id = theNode.attr('id');
 		var parent = tree_obj.parent(node);
 		if (parent != -1) {
-			var has_parent = true;
+			console.log("we have a parent");
 			var parent_obj_type = tree_obj.get_type(parent);
+			var parent_obj_id = node_id2id($(parent).attr('id'), parent_obj_type);
+			console.log("we have a parent 2");
+			
+			console.log("we have a parent 3");
+			console.log(parent);
+			
+			if (parent_obj_type=='category') {
+				if (parent_obj_id=='rootFoldersCategory') {
+					console.log("move folder to root");
+					//savedata_handler({parent:false}, obj_type, obj_id, {});
+					var has_parent = false;
+					var parent_obj_type = null;
+				};
+			} else if (parent_obj_type=='folder') {
+				console.log("move folder to other folder (left)");
+				savedata_handler({parent:parent_obj_id}, obj_type, obj_id, {});
+				return false;
+			} else {
+				console.log("wtf?");
+			}
 		} else {
+			console.log("no parent");
 			var has_parent = false;
 			var parent_obj_type = null;
 		};
@@ -283,50 +359,28 @@ $(function () {
 			} else {
 				nodedata.folder = false;
 			};
-		}
-		
-		if (obj_id != "") {
-			// this is a update
-			var url = "/admin/filer/folder/api/" + obj_type + "/" + node_id2id(obj_id, obj_type) + "/";
-			$.ajax({
-				type:'PUT',
-				//dataType: 'json',
-				url: url,
-				data: nodedata,
-				async: true,
-				success: function(data, textStatus, request) {
-					//alert('success: ' + textStatus + '   ' + data);
-				},
-				error: function(request, textStatus, errorThrown) {
-					//alert('failed: ' + textStatus + '    ' + errorThrown);
-					$.tree.rollback(rb);
-				}
-			});
-		} else {
-			// this is a create
-			var url = "/admin/filer/folder/api/" + obj_type + "/";
-			$.ajax({
-				type:'POST',
-				dataType: 'json',
-				url: url,
-				data: nodedata,
-				async: true,
-				success: function(xdata, textStatus) {
-					var node_id = id2node_id(xdata['id'], obj_type);
-					theNode.attr('id', node_id);
-					var theA = theNode.children('a:first');
-					var theINS = theNode.children('a:first').children('ins');
-					theA.html("");
-					theA.append(theINS);
-					theA.append(xdata['name']);
-				},
-				error: function(request, textStatus, errorThrown) {
-					$.tree.rollback(rb);
-				}
-			});
-			
-		}
-		
+		};
+		var error_handler = function(request, textStatus, errorThrown) {
+			//alert('failed: ' + textStatus + '    ' + errorThrown);
+			$.tree.rollback(rb);
+			console.log('error: rollback!');
+		};
+		var success_create_handler = function(xdata, textStatus) {
+			var node_id = id2node_id(xdata['id'], obj_type);
+			theNode.attr('id', node_id);
+			var theA = theNode.children('a:first');
+			var theINS = theNode.children('a:first').children('ins');
+			theA.html("");
+			theA.append(theINS);
+			theA.append(xdata['name']);
+			console.log('success');
+		};
+		console.log("before savedata");
+		savedata_handler(nodedata, obj_type, obj_id, {
+			error_create:error_handler,
+			error_update:error_handler,
+			success_create:success_create_handler
+		});
 	};
 	var deletenode_handler = function(node, tree_obj, rb) {
 		var obj_type = tree_obj.get_type(node);
@@ -356,6 +410,7 @@ $(function () {
 	};
 	var onmove_handler = function(node, ref_node, type, tree_obj, rb) {
 		//onsole.log('move ' + node);
+		alert("wait!");
 		return savenode_handler(node, tree_obj, rb);
 	};
 	var onrename_handler = function(node, tree_obj, rb) {
@@ -373,6 +428,42 @@ $(function () {
 		tree_obj.container.find('.search').removeClass('search');
 		
 	};
+	
+	var category_beforemove_handler = function(node, ref_node, type, tree_obj, rb) {
+		console.log(node);
+		var obj_type = tree_obj.get_type(node);
+		var obj = tree_obj.get_node(node);
+		var obj_id = node_id2id(obj.attr('id'), obj_type);
+		if (type=='inside') {
+			var parent = ref_node;
+		} else if (type=='before') {
+			//var parent = tree_obj.prev(ref_node, true);
+			var parent = tree_obj.parent(ref_node);
+		} else if (type=='after') {
+			//var parent = tree_obj.next(ref_node, true);
+			var parent = tree_obj.parent(ref_node);
+		};
+		console.log(tree_obj);
+		console.log(type + ' "' + tree_obj.get_text(ref_node) + '"');
+		console.log(parent);
+		var parent_type = tree_obj.get_type(parent);
+		var parent_id = node_id2id($(parent).attr('id'), parent_type);
+		
+		// depending on what the target is
+		if (parent_type=='category') {
+			if (parent_id=='rootFoldersCategory') {
+				console.log("move folder to root");
+				savedata_handler({parent:false}, obj_type, obj_id, {});
+				return true;
+				
+			}
+		} else if (parent_type=='folder') {
+			console.log("move folder to other folder (left)");
+			savedata_handler({parent:parent_id}, obj_type, obj_id, {});
+			return false;
+		}
+		return false;
+	}
 	
 	var update_folder_tree_callback = function(data, textStatus) {
 		var folderrules = $.extend({}, rules);
@@ -393,9 +484,10 @@ $(function () {
 				ondelete: ondelete_handler,
 				onfocus: onfocus_handler,
 				onchange: function(node, tree_obj) {
-					console.log('folders onchange before: ' + $.tree.focused().container.attr('id'));
+					//console.log('folders onchange before: ' + $.tree.focused().container.attr('id'));
 					tree_obj.focus();
-					console.log('folders onchange after: ' + $.tree.focused().container.attr('id'));
+					//console.log('folders onchange after: ' + $.tree.focused().container.attr('id'));
+					var xxxx = show_item_preview(node, tree_obj);
 				},
 				beforedata: function(n,t) {
 					if (n==false){
@@ -427,6 +519,53 @@ $(function () {
 		console.log('folders update: ' + $.tree.focused().container.attr('id'));
 	};
 	
+	
+	var construct_item_preview_html = function(item) {
+			var item_html = '';
+			item_html += '<div class="preview"><img src="' + item.thumbnail + '" alt="" /></div>';
+			item_html += '<table>';
+			$.each(item.properties, function(i,v){
+				var thing = item.properties[i];
+				item_html += '<tr><th>' + thing.label + '</th><td>' + thing.value + '</td></tr>';
+			});
+			item_html += '</table>';
+			item_html += '<a href="' + item.admin_change_url + '" target="_blank">more...</a>'
+			item_html += '';
+			return item_html;
+		};
+	var handle_item_preview = function(data, textStatus) {
+		var item_data = {}
+		item_data.thumbnail = data.icons['128'];
+		item_data.admin_change_url = data.admin_change_url;
+		if (data.node_type == 'folder') {
+			item_data.properties = [
+				{label:'Name', value:data.name},
+				{label:'Subfolders', value:data.children_count | 0},
+				{label:'Files', value:data.file_count | 0},
+				{label:'Created', value:data.created_at},
+				{label:'Modified', value:data.modified_at},
+			];
+		} else {
+			item_data.properties = [
+				{label:'Name', value:data.name},
+				{label:'Size', value:data.size},
+				{label:'Created', value:data.uploaded_at},
+				{label:'Modified', value:data.modified_at},
+			];
+		}
+		
+		var html_string = construct_item_preview_html(item_data);
+		var html_node = $(html_string);
+		//onsole.log(html_node);
+		$('#node_preview').html(html_node);
+	}
+	var show_item_preview = function(node, tree_obj) {
+		var obj_type = tree_obj.get_type(node);
+		var theNode = tree_obj.get_node(node);
+		var obj_id = theNode.attr('id');
+		$.getJSON("/admin/filer/folder/api/" + obj_type + "/" + node_id2id(obj_id, obj_type) + "/",{},handle_item_preview);
+	};
+	
 	var category_tree_rules = $.extend({}, rules);
 	var category_tree_options = {
 		data: {
@@ -452,23 +591,30 @@ $(function () {
 				//$.getJSON("/admin/filer/folder/api/folder/" + folder_id + "/children/",{},update_folder_tree_callback);
 				$.getJSON("/admin/filer/folder/api/folder/" + folder_id + "/",{},update_folder_tree_callback);
 				//onsole.log('categories onchange: ' + $.tree.focused().container.attr('id'));
-			}
+			},
+			//beforemove: category_beforemove_handler
 		},
 		types: item_types,
 		rules: category_tree_rules,
 		plugins: tree_plugins,
 		ui: ui_options
 	}
-	
+	$("#category_tree_container").resizable();
+	$("#folder_tree_container").resizable();
 	var categoryTree = $("#category_tree").tree(category_tree_options);
 });
 </script>
 
-<div id="category_tree_container">
+<div id="category_tree_container" class="ui-widget-content">
 	<div class="category_tree" id="category_tree" style=""></div>
 </div>
 <div id="folder_tree_container">
 	<div class="folder_tree" id="folder_tree" style=""></div>
+</div>
+<div id="node_preview_container">
+	<div class="node_preview" id="node_preview" style="">
+		
+	</div>
 </div>
 
 <div style="clear:both;"></div>

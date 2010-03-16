@@ -15,7 +15,6 @@ from filer.models import tools
 from django.conf import settings
 # forms
 class FileAdminChangeFrom(forms.ModelForm):
-    #subject_location = forms.CharField(max_length=64, required=False)
     class Meta:
         model = File
 
@@ -35,7 +34,7 @@ class FileAdmin(PrimitivePermissionAwareModelAdmin):
     form = FileAdminChangeFrom
     fieldsets = (
         (None, {
-            'fields': ('name', 'owner',)#'contact',
+            'fields': ('name', 'owner','description')#'contact',
         }),
     )
     def response_change(self, request, obj):
@@ -100,6 +99,17 @@ class FileAdmin(PrimitivePermissionAwareModelAdmin):
         )
         url_patterns.extend(urls)
         return url_patterns
+    def get_model_perms(self, request):
+        """
+        It seems this is only used for the list view. NICE :-)
+        """
+        return {
+            'add': False,
+            'change': False,
+            'delete': False,
+        }
+    #def has_change_permission(self, request, obj=None):
+    #    return False
     #def add_view(self, request):
     #    return HttpResponseRedirect(reverse('admin:filer-directory_listing-root'))
     #def changelist_view(self, request, extra_context=None):

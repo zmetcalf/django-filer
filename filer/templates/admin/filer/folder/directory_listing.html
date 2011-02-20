@@ -7,8 +7,10 @@
 <script type="text/javascript" src="{% admin_media_prefix %}js/jquery.min.js"></script>
 <script type="text/javascript" src="{% filer_staticmedia_prefix %}js/jquery-ui-1.7.2.custom.min.js"></script>
 <script type="text/javascript" src="{% filer_staticmedia_prefix %}js/jquery.cookie.js"></script>
+{% if not simple_upload %}
 <script type="text/javascript" src="{% filer_staticmedia_prefix %}js/swfupload.js"></script>
 <script type="text/javascript" src="{% filer_staticmedia_prefix %}js/swfupload.queue.js"></script>
+{% endif %}
 
 <script type="text/javascript" src="{% admin_media_prefix %}js/admin/RelatedObjectLookups.js"></script>
 <script type="text/javascript" src="{% filer_staticmedia_prefix %}js/popup_handling.js"></script>
@@ -37,7 +39,18 @@
 
 {% block sidebar %}
 <div id="content-related">
-    {% include "admin/filer/tools/clipboard/clipboard.html" %}
+ {% include "admin/filer/tools/clipboard/clipboard.html" %}
+ {% if simple_upload %}
+ <div id="recent-uploads">
+  {% trans "Recently changed folders:" %}<br>
+  <a href="{% url admin:filer-directory_listing-unfiled_images %}">{% trans "unfiled files"|title noop %}</a><br>
+  {% if recent_uploads %}
+  {% for fldr in recent_uploads %}
+  <a href="{{ fldr.get_admin_directory_listing_url_path }}">{{ fldr.name }}</a><br>
+  {% endfor %}
+ </div>
+ {% endif %}
+ {% endif %}
 </div>
 {% endblock %}
 
@@ -47,7 +60,11 @@
 <div id="content-main">
     <ul class="object-tools">
         {% if folder.can_have_subfolders %}<li><a id="id_new_folder" href="{% url admin:filer-directory_listing-make_root_folder %}?parent_id={{ folder.id }}" class="addlink" onclick="return showAddAnotherPopup(this);" title="{% trans "Adds a new Folder" %}">{% trans "New Folder" %}</a>{% endif %}</li>
+        {% if simple_upload %}
+        <li><a id="id_simple_upload" class="addlink" href="{% url admin:filer-simple_upload %}?folder_id={{ folder.id }}">Upload</a></li>
+        {% else %}
         <li>{% include "admin/filer/tools/upload_button.html" %}</li>
+        {% endif %}
         {% comment %}
         <li><a id="id_directory_root" href="{% url admin:filer-directory_listing-root %}{% if is_popup %}?_popup=1{% if select_folder %}&select_folder=1{% endif %}{% endif %}" class="link" title="{% trans "Go back to" %} {% trans "root"|title %} {% trans "folder" %}">{% trans "root"|title %}</a></li>
         <li><a id="id_missing_data_images" href="{% url admin:filer-directory_listing-images_with_missing_data %}{% if is_popup %}?_popup=1{% if select_folder %}&select_folder=1{% endif %}{% endif %}" class="link" title="{% trans "Show images with missing metadata" noop %}">{% trans "Incomplete Images" noop %}</a></li>
@@ -61,7 +78,7 @@
         <h1 class="folder_header">{% if folder.parent %}<a href="{% url admin:filer-directory_listing folder.parent.id %}{% if is_popup %}?_popup=1{% if select_folder %}&select_folder=1{% endif %}{% endif %}" title="{% trans "Go back to the parent folder" %}">&uarr;</a>{% else %}<a href="{% url admin:filer-directory_listing-root %}{% if is_popup %}?_popup=1{% if select_folder %}&select_folder=1{% endif %}{% endif %}" title="{% trans "Go back to" %} {% trans "root"|title %} {% trans "folder" %}">&uarr;</a>{% endif %} 
             <img src="{{ folder.icons.32 }}" alt="{% trans "Folder Icon" %}" /> {{ folder.name }}
             <span class="small quiet">({% blocktrans count folder.children_count as counter %}1 folder{% plural %}{{ counter }} folders{% endblocktrans %}, {% blocktrans count folder.file_count as counter %}1 file{% plural %}{{ counter }} files{% endblocktrans %})</span>
-            <span>{% if is_popup %}{% else %}<a style="display: block; float: right;" class="changelink" href="/admin/filer/folder/{{ folder.id }}/" title="{% trans "Change current folder details" %}">{% trans "Change" %}</a>{% endif %}</span>
+            <span>{% if is_popup %}{% else %}<a style="display: block; float: right;" class="changelink" href="{% url admin:filer-directory_listing-root %}{{ folder.id }}/" title="{% trans "Change current folder details" %}">{% trans "Change" %}</a>{% endif %}</span>
         </h1>
         {% else %}{% if folder.is_smart_folder %}
         <h1 class="folder_header"><a href="{% url admin:filer-directory_listing-root %}{% if is_popup %}?_popup=1{% endif %}">&uarr;</a>

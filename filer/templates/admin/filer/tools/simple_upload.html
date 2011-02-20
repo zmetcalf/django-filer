@@ -1,0 +1,13 @@
+{% extends "admin/filer/base_site.html" %}
+{% load i18n %}
+{% load adminmedia filermedia %}
+
+{% block title %}Upload some files{% endblock %}
+{% block content %}
+
+<form enctype="multipart/form-data" action="{% url admin:filer-simple_upload %}" method="post">
+{{ form.as_p }}
+<input type="submit" value="{% trans "Start uploading" %}"/>
+</form>
+
+{% endblock %}

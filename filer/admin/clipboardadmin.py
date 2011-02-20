@@ -11,8 +11,9 @@ from filer.models import Clipboard, ClipboardItem, File, Image
 from filer.utils.files import generic_handle_file
 from filer.models import tools
 from filer import settings as filer_settings
-from filer.admin.tools import popup_param
+from filer.admin.tools import popup_param, register_recent_folder
 from django.views.decorators.csrf import csrf_exempt
+from django.core import urlresolvers
 
 # forms... sucks, types should be automatic
 class UploadFileForm(forms.ModelForm):
@@ -56,6 +57,9 @@ class ClipboardAdmin(admin.ModelAdmin):
             url(r'^operations/upload/$',
                 self.ajax_upload,
                 name='filer-ajax_upload'),
+            url(r'^operations/myupload/$',
+                self.admin_site.admin_view(self.simple_upload),
+                name='filer-simple_upload'),
         )
         url_patterns.extend(urls)
         return url_patterns
@@ -121,6 +125,74 @@ class ClipboardAdmin(admin.ModelAdmin):
         return render_to_response('admin/filer/tools/clipboard/clipboard_item_rows.html',
                                   {'items': file_items },
                                   context_instance=RequestContext(request))
+
+
+    def handle_uploaded_file(self, request, afile):
+        original_filename = afile.name
+        files = generic_handle_file(afile, original_filename)
+        file_items = []
+        for ifile, iname in files:
+            try:
+                iext = os.path.splitext(iname)[1].lower()
+            except:
+                iext = ''
+            if iext in ['.jpg', '.jpeg', '.png', '.gif']:
+                uploadform = UploadImageFileForm({'original_filename':iname,
+                                                  'owner': request.user.pk},
+                                                {'file':ifile})
+            else:
+                uploadform = UploadFileForm({'original_filename':iname,
+                                             'owner': request.user.pk},
+                                            {'file':ifile})
+            if uploadform.is_valid():
+                try:
+                    file = uploadform.save(commit=False)
+                    # Enforce the FILER_IS_PUBLIC_DEFAULT
+                    file.is_public = filer_settings.FILER_IS_PUBLIC_DEFAULT
+                    file.save()
+                    file_items.append(file)
+                    clipboard_item = ClipboardItem(clipboard=clipboard, file=file)
+                    clipboard_item.save()
+                except Exception, e:
+                    #print e
+                    pass
+            else:
+                pass#print uploadform.errors
+
+        pass
+
+
+    def simple_upload(self, request, folder_id=None):
+        class TmpUploadFileForm(forms.Form):
+           file_1  = forms.FileField(required=False)
+           file_2  = forms.FileField(required=False)
+           file_3  = forms.FileField(required=False)
+           file_4  = forms.FileField(required=False)
+           file_5  = forms.FileField(required=False)
+
+        if not folder_id:
+            folder_id = request.REQUEST.get('folder_id', None)
+
+        if folder_id:
+            register_recent_folder(folder_id, request)
+
+        if request.method == 'POST':
+            form = TmpUploadFileForm(request.POST, request.FILES)
+            if form.is_valid():
+                for k,afile in request.FILES.items():
+                    if afile == None: continue
+                    self.handle_uploaded_file(request, afile)
+                next_page = urlresolvers.reverse("admin:filer-directory_listing-unfiled_images")
+                return HttpResponseRedirect(next_page)
+        else:
+            form = TmpUploadFileForm()
+
+        return render_to_response(
+            'admin/filer/tools/simple_upload.html',
+            {'form': form },
+            context_instance=RequestContext(request))
+
+
     def move_file_to_clipboard(self, request):
         #print "move file"
         if request.method == 'POST':
@@ -128,10 +200,16 @@ class ClipboardAdmin(admin.ModelAdmin):
             clipboard = tools.get_user_clipboard(request.user)
             if file_id:
                 file = File.objects.get(id=file_id)
+                try: folder_id = "%s" % file.folder.id
+                except: folder_id = None
                 if file.has_edit_permission(request):
                     tools.move_file_to_clipboard([file], clipboard)
                 else:
                     raise PermissionDenied
+
+                if filer_settings.FILER_USE_SIMPLE_UPLOAD and folder_id:
+                    register_recent_folder(folder_id, request)
+
         return HttpResponseRedirect( '%s%s' % (request.POST.get('redirect_to', ''), popup_param(request) ) )
     def get_model_perms(self, request):
         """

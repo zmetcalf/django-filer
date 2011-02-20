@@ -6,8 +6,10 @@ from django.core.exceptions import PermissionDenied
 
 from models import Folder, Image, Clipboard, File
 from models import tools
+from admin.tools import register_recent_folder
 
 from django import forms
+from settings import FILER_STATICMEDIA_PREFIX, FILER_USE_SIMPLE_UPLOAD
 
 
 class NewFolderForm(forms.ModelForm):
@@ -110,8 +112,14 @@ def paste_clipboard_to_folder(request):
         if folder.has_add_children_permission(request):
             tools.move_files_from_clipboard_to_folder(clipboard, folder)
             tools.discard_clipboard(clipboard)
+
+            if FILER_USE_SIMPLE_UPLOAD:
+                folder_id = "%s" % folder.id
+                register_recent_folder(folder_id, request)
+
         else:
             raise PermissionDenied
+
     return HttpResponseRedirect( '%s%s' % (request.REQUEST.get('redirect_to', ''), popup_param(request) ) )
 
 @login_required

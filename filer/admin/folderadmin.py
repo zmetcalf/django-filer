@@ -15,7 +15,7 @@ from filer.admin.permissions import PrimitivePermissionAwareModelAdmin
 from filer.admin.tools import popup_status, selectfolder_status, userperms_for_request
 from filer.models import Folder, FolderRoot, UnfiledImages, ImagesWithMissingData, File
 from filer.models import tools
-from filer.settings import FILER_STATICMEDIA_PREFIX, FILER_PAGINATE_BY
+from filer.settings import FILER_STATICMEDIA_PREFIX, FILER_PAGINATE_BY, FILER_USE_SIMPLE_UPLOAD
 
 
 # Forms
@@ -227,6 +227,21 @@ class FolderAdmin(PrimitivePermissionAwareModelAdmin):
             }
         except:
             permissions = {}
+
+        simple_upload = True if FILER_USE_SIMPLE_UPLOAD else False
+        recent_uploads = []
+        if simple_upload:
+            hist = request.session.get('filer_recent_uploads', '')
+            hist = [ fid for fid in hist.split(',') if hist != '' ]
+            for fid in hist:
+                #url = reverse('admin:filer-directory_listing', kwargs={'folder_id': fid})
+                try:
+                    fldr = Folder.objects.get(id=fid)
+                    recent_uploads.append(fldr)
+                except Folder.DoesNotExist:
+                    pass
+
+
         #folder_children = folder_children.sort(cmp=lambda x,y: cmp(x.name.lower(), y.name.lower()))
         folder_files.sort(cmp=lambda x, y: cmp(x.label.lower(), y.label.lower()))
         #import ipdb; ipdb.set_trace()
@@ -259,4 +274,6 @@ class FolderAdmin(PrimitivePermissionAwareModelAdmin):
                 'is_popup': popup_status(request),
                 'select_folder': selectfolder_status(request),
                 'root_path': "/%s" % admin.site.root_path, # needed in the admin/base.html template for logout links and stuff 
+                'simple_upload': simple_upload,
+                'recent_uploads': recent_uploads, # folders where simple_upload was recently started
             }, context_instance=RequestContext(request))

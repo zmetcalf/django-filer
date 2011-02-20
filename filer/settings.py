@@ -54,3 +54,5 @@ if not FILER_PRIVATEMEDIA_URL.endswith('/'):
 FILER_ADMIN_ICON_SIZES = (
         '16', '32', '48', '64', 
 )
+
+FILER_USE_SIMPLE_UPLOAD = getattr(settings, 'FILER_USE_SIMPLE_UPLOAD', False)

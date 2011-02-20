@@ -164,11 +164,11 @@ class ClipboardAdmin(admin.ModelAdmin):
 
     def simple_upload(self, request, folder_id=None):
         class TmpUploadFileForm(forms.Form):
-           file_1  = forms.FileField(required=False)
-           file_2  = forms.FileField(required=False)
-           file_3  = forms.FileField(required=False)
-           file_4  = forms.FileField(required=False)
-           file_5  = forms.FileField(required=False)
+            file_1  = forms.FileField(required=False)
+            file_2  = forms.FileField(required=False)
+            file_3  = forms.FileField(required=False)
+            file_4  = forms.FileField(required=False)
+            file_5  = forms.FileField(required=False)
 
         if not folder_id:
             folder_id = request.REQUEST.get('folder_id', None)

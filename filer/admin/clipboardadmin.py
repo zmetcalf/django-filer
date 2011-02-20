@@ -88,37 +88,7 @@ class ClipboardAdmin(admin.ModelAdmin):
                 return HttpResponse("must be POST")
             original_filename = request.POST.get('Filename')
             file = request.FILES.get('Filedata')
-            # Get clipboad
-            clipboard, was_clipboard_created = Clipboard.objects.get_or_create(user=request.user)
-            files = generic_handle_file(file, original_filename)
-            file_items = []
-            for ifile, iname in files:
-                try:
-                    iext = os.path.splitext(iname)[1].lower()
-                except:
-                    iext = ''
-                if iext in ['.jpg', '.jpeg', '.png', '.gif']:
-                    uploadform = UploadImageFileForm({'original_filename':iname,
-                                                      'owner': request.user.pk},
-                                                    {'file':ifile})
-                else:
-                    uploadform = UploadFileForm({'original_filename':iname,
-                                                 'owner': request.user.pk},
-                                                {'file':ifile})
-                if uploadform.is_valid():
-                    try:
-                        file = uploadform.save(commit=False)
-                        # Enforce the FILER_IS_PUBLIC_DEFAULT
-                        file.is_public = filer_settings.FILER_IS_PUBLIC_DEFAULT
-                        file.save()
-                        file_items.append(file)
-                        clipboard_item = ClipboardItem(clipboard=clipboard, file=file)
-                        clipboard_item.save()
-                    except Exception, e:
-                        #print e
-                        pass
-                else:
-                    pass#print uploadform.errors
+            file_items = self.handle_uploaded_file(request, file)
         except Exception, e:
             #print e
             pass
@@ -129,6 +99,7 @@ class ClipboardAdmin(admin.ModelAdmin):
 
     def handle_uploaded_file(self, request, afile):
         original_filename = afile.name
+        clipboard, was_clipboard_created = Clipboard.objects.get_or_create(user=request.user)
         files = generic_handle_file(afile, original_filename)
         file_items = []
         for ifile, iname in files:
@@ -158,8 +129,7 @@ class ClipboardAdmin(admin.ModelAdmin):
                     pass
             else:
                 pass#print uploadform.errors
-
-        pass
+        return file_items
 
 
     def simple_upload(self, request, folder_id=None):

@@ -6,6 +6,7 @@
 {% block content %}
 
 <form enctype="multipart/form-data" action="{% url admin:filer-simple_upload %}" method="post">
+	{% csrf_token %}
 {{ form.as_p }}
 <input type="submit" value="{% trans "Start uploading" %}"/>
 </form>

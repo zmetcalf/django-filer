@@ -4,16 +4,17 @@ from django.conf import settings
 from django.contrib import admin
 from django.contrib.admin.models import User
 from django.core.exceptions import PermissionDenied
-from django.http import HttpResponseRedirect, HttpResponse
-from django.shortcuts import render_to_response
+from django.http import HttpResponseRedirect, HttpResponse, HttpResponseBadRequest
 from django.template import RequestContext
-from django.views.decorators.csrf import csrf_exempt
+from django.shortcuts import render_to_response
 from filer import settings as filer_settings
 from filer.admin.tools import popup_param
 from filer.models import Clipboard, ClipboardItem, File, Image, tools
 from filer.utils.files import generic_handle_file
 import os
 
+from filer.admin.upload import handle_upload, UploadException
+from django.views.decorators.csrf import csrf_exempt
 
 class UploadFileForm(forms.ModelForm):
     class Meta:
@@ -69,21 +70,11 @@ class ClipboardAdmin(admin.ModelAdmin):
         althow it may be a zip file, that will be unpacked.
         """
         try:
-            # flashcookie-hack (flash does not submit the cookie, so we send
-            # the django sessionid over regular post
-            engine = __import__(settings.SESSION_ENGINE, {}, {}, [''])
-            session_key = request.POST.get('jsessionid')
-            request.session = engine.SessionStore(session_key)
-            request.user = User.objects.get(
-                                    id=request.session['_auth_user_id'])
-            # upload and save the file
-            if not request.method == 'POST':
-                return HttpResponse("must be POST")
-            original_filename = request.POST.get('Filename')
-            file = request.FILES.get('Filedata')
+            upload, filename, is_raw = handle_upload(request)
+
             # Get clipboad
             clipboard = Clipboard.objects.get_or_create(user=request.user)[0]
-            files = generic_handle_file(file, original_filename)
+            files = generic_handle_file(upload, filename)
             file_items = []
             for ifile, iname in files:
                 try:
@@ -101,25 +92,21 @@ class ClipboardAdmin(admin.ModelAdmin):
                                             'owner': request.user.pk
                                             }, {'file': ifile})
                 if uploadform.is_valid():
-                    try:
-                        file = uploadform.save(commit=False)
-                        # Enforce the FILER_IS_PUBLIC_DEFAULT
-                        file.is_public = filer_settings.FILER_IS_PUBLIC_DEFAULT
-                        file.save()
-                        file_items.append(file)
-                        clipboard_item = ClipboardItem(
-                                            clipboard=clipboard, file=file)
-                        clipboard_item.save()
-                    except Exception, e:
-                        pass
+                    file = uploadform.save(commit=False)
+                    # Enforce the FILER_IS_PUBLIC_DEFAULT
+                    file.is_public = filer_settings.FILER_IS_PUBLIC_DEFAULT
+                    file.save()
+                    file_items.append(file)
+                    clipboard_item = ClipboardItem(
+                                        clipboard=clipboard, file=file)
+                    clipboard_item.save()
                 else:
                     pass
         except Exception, e:
             pass
-        return render_to_response(
-                    'admin/filer/tools/clipboard/clipboard_item_rows.html',
-                    {'items': file_items},
-                    context_instance=RequestContext(request))
+        return render_to_response('admin/filer/tools/clipboard/upload_response.json',
+                                  {'items': file_items },
+                                  context_instance=RequestContext(request))
 
     def get_model_perms(self, request):
         """

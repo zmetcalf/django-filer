@@ -151,9 +151,11 @@ class Image(File):
                 thumb = self.file.get_thumbnail(thumbnail_options)
                 _icons[size] = thumb.url
             except Exception, e:
-                # swallow the the exception to avoid to bubble it up
+                import ipdb;ipdb.set_trace()
+                # swallow the exception to avoid it to bubble up
                 # in the template {{ image.icons.48 }}
-                pass
+                print e
+                _icons[size] = super(Image, self).icons[size]
         return _icons
 
     @property

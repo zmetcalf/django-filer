@@ -13,6 +13,7 @@ def handle_upload(request):
     if not request.method == "POST":
         raise UploadException("AJAX request not valid: must be POST")
     if request.is_ajax():
+        import ipdb;ipdb.set_trace()
         # the file is stored raw in the request
         is_raw = True
         filename = request.GET.get('qqfile', False) or request.GET.get('filename', False) or ''

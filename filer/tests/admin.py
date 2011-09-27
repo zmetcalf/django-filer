@@ -77,18 +77,29 @@ class FilerClipboardAdminUrlsTests(TestCase):
         for img in Image.objects.all():
             img.delete()
 
-    def test_filer_upload_file(self):
+    def test_filer_regular_upload_file(self):
         self.assertEqual(Image.objects.count(), 0)
         file = DjangoFile(open(self.filename))
         response = self.client.post(reverse('admin:filer-ajax_upload'),
                                     {
-                                       'Filename':self.image_name,
+                                        'Filename': self.image_name,
                                         'Filedata': file,
-                                       'jsessionid':self.client.session.session_key,
                                     })
+        self.assertEqual(response.status_code, 200)
         self.assertEqual(Image.objects.count(), 1)
-        self.assertEqual(Image.objects.all()[0].original_filename,
-                         self.image_name)
+        self.assertEqual(Image.objects.all()[0].original_filename, self.image_name)
+
+    def test_filer_xhr_upload_file(self):
+        self.assertEqual(Image.objects.count(), 0)
+        file = DjangoFile(open(self.filename))
+        url = reverse('admin:filer-ajax_upload') + '?qqfile=' + self.image_name
+        data = self.img.tostring()
+        response = self.client.post(url, data,
+                                    HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+                                    content_type='application/octet-stream')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Image.objects.count(), 1)
+        self.assertEqual(Image.objects.all()[0].original_filename, self.image_name)
 
 class  BulkOperationsMixin(object):
     def setUp(self):

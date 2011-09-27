@@ -19,6 +19,7 @@ INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.sessions',
     'django_jenkins',
+    'pyzen',
 ]
 ROOT_URLCONF = 'project.urls'
 

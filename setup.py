@@ -1,31 +1,19 @@
 from setuptools import setup, find_packages
-import os
 
-version = __import__('filer').__version__
-
-def read(fname):
-    # read the contents of a text file
-    return open(os.path.join(os.path.dirname(__file__), fname)).read()
-
-install_requires = [
-    'setuptools',
-    'easy-thumbnails>=1.0-alpha-17',
-    'django-mptt>=0.2.1',
-    'django_polymorphic',
-]
 
 setup(
     name = "django-filer",
-    version = version,
+    version = ":versiontools:filer:",
     url = 'http://github.com/stefanfoulis/django-filer',
     license = 'BSD',
     platforms=['OS Independent'],
     description = "A file management application for django that makes handling of files and images a breeze.",
-    long_description = read('README.rst'),
+    long_description = open('README.rst').read(),
     author = 'Stefan Foulis',
     author_email = 'stefan.foulis@gmail.com',
     packages=find_packages(),
-    install_requires = install_requires,
+    setup_requires = ['versiontools >= 1.8'],
+    install_requires = ['easy-thumbnails >= 1.0-alpha-17', 'django-mptt >= 0.2.1', 'django_polymorphic'],
     include_package_data=True,
     zip_safe=False,
     classifiers = [

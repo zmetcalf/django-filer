@@ -174,6 +174,27 @@ class File(PolymorphicModel, mixins.IconsMixin):
     def __lt__(self, other):
         return cmp(self.label.lower(), other.label.lower()) < 0
 
+    def has_perm(self, user, perm):
+        """
+        perm can be "change", "delete"
+        """
+        # fake it for now
+        class request(object):
+            user = user
+        self.has_generic_permission(request)
+        if user == self.owner:
+            return True
+
+    def can_change(self, user):
+        return self.has_perm(user, 'change')
+
+    def can_view(self, user):
+        return self.has_perm(user, 'view')
+
+    def can_delete(self, user):
+        return self.has_perm(user, 'delete')
+
+    # legacy permissions
     def has_edit_permission(self, request):
         return self.has_generic_permission(request, 'edit')
 
@@ -199,6 +220,7 @@ class File(PolymorphicModel, mixins.IconsMixin):
             return self.folder.has_generic_permission(request, permission_type)
         else:
             return False
+    # end legacy permissions
 
     def __unicode__(self):
         if self.name in ('', None):

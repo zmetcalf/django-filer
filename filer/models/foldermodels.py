@@ -143,6 +143,25 @@ class Folder(models.Model, mixins.IconsMixin):
     def pretty_logical_path(self):
         return u"/%s" % u"/".join([f.name for f in self.logical_path+[self]])
 
+    def has_perm(self, user, perm):
+        if user.is_superuser:
+            return True
+        if user == self.owner:
+            return True
+
+    def can_change(self, user):
+        return self.has_perm(user, 'can_change')
+
+    def can_view(self, user):
+        return self.has_perm(user, 'can_view')
+
+    def can_delete(self, user):
+        return self.has_perm(user, 'can_delete')
+
+    def can_add_children(self, user):
+        return self.has_perm(user, 'can_add_children')
+
+    # legacy permsission methods
     def has_edit_permission(self, request):
         return self.has_generic_permission(request, 'edit')
 
@@ -185,6 +204,7 @@ class Folder(models.Model, mixins.IconsMixin):
                 else:
                     self.permission_cache[permission_type] = self.id in permission
             return self.permission_cache[permission_type]
+    # end legacy permission models
 
     def get_admin_url_path(self):
         return urlresolvers.reverse('admin:filer_folder_change',

@@ -234,7 +234,7 @@ class FolderPermission(models.Model):
         (CHILDREN, _('this item and all children')),
     )
 
-    PERMISIONS = (
+    PERMISSIONS = (
         (ALLOW, _('allow')),
         (DENY, _('deny')),
     )
@@ -250,9 +250,9 @@ class FolderPermission(models.Model):
                               verbose_name=_("group"), blank=True, null=True)
     everybody = models.BooleanField(_("everybody"), default=False)
 
-    can_edit = models.SmallIntegerField(_("can edit"), choices=PERMISIONS, blank=True, null=True, default=None)
-    can_read = models.SmallIntegerField(_("can read"), choices=PERMISIONS, blank=True, null=True, default=None)
-    can_add_children = models.SmallIntegerField(_("can add children"), choices=PERMISIONS, blank=True, null=True, default=None)
+    can_edit = models.SmallIntegerField(_("can edit"), choices=PERMISSIONS, blank=True, null=True, default=None)
+    can_read = models.SmallIntegerField(_("can read"), choices=PERMISSIONS, blank=True, null=True, default=None)
+    can_add_children = models.SmallIntegerField(_("can add children"), choices=PERMISSIONS, blank=True, null=True, default=None)
 
     objects = FolderPermissionManager()
 

@@ -11,7 +11,7 @@ from django.template.loader import render_to_string
 from django.utils.safestring import mark_safe
 from django.utils.text import truncate_words
 from filer.models import File
-from filer.settings import FILER_STATICMEDIA_PREFIX
+from filer import settings as filer_settings
 
 import logging
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ class AdminFileWidget(ForeignKeyRawIdWidget):
                 if filer_settings.FILER_DEBUG:
                     raise e
         if not related_url:
-            related_url = reverse('admin:filer-directory_listing-root')
+            related_url = reverse('admin:filer-directory_listing-last')
         params = self.url_parameters()
         if params:
             lookup_url = '?' + '&amp;'.join(
@@ -54,7 +54,7 @@ class AdminFileWidget(ForeignKeyRawIdWidget):
         # ForeignKeyRawIdWidget adds
         hidden_input = super(ForeignKeyRawIdWidget, self).render(
                                                             name, value, attrs)
-        filer_static_prefix = FILER_STATICMEDIA_PREFIX
+        filer_static_prefix = filer_settings.FILER_STATICMEDIA_PREFIX
         if not filer_static_prefix[-1] == '/':
             filer_static_prefix += '/'
         context = {
@@ -84,7 +84,7 @@ class AdminFileWidget(ForeignKeyRawIdWidget):
         return obj
 
     class Media:
-        js = (FILER_STATICMEDIA_PREFIX + 'js/popup_handling.js',)
+        js = (filer_settings.FILER_STATICMEDIA_PREFIX + 'js/popup_handling.js',)
 
 
 class AdminFileFormField(forms.ModelChoiceField):
@@ -115,20 +115,8 @@ class FilerFileField(models.ForeignKey):
     def __init__(self, **kwargs):
         # we call ForeignKey.__init__ with the Image model as parameter...
         # a FilerImageFiled can only be a ForeignKey to a Image
-        self.validate_related_name(kwargs.get('related_name', None))
         return super(FilerFileField, self).__init__(
-                                        self.default_model_class, **kwargs)
-
-    def validate_related_name(self, name):
-        if not name:
-            return
-        if name and hasattr(self.default_model_class, name):
-            raise ImproperlyConfigured(
-                ("%s fields cannot have related name %r, this property " + \
-                 "already exists on %s") % (self.__class__.__name__,
-                                  name,
-                                  self.default_form_class.__name__)
-            )
+            self.default_model_class, **kwargs)
 
     def formfield(self, **kwargs):
         # This is a fairly standard way to set up some defaults

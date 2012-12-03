@@ -54,6 +54,37 @@ class UnfiledImages(DummyFolder):
         return urlresolvers.reverse(
                             'admin:filer-directory_listing-unfiled_images')
 
+    def get_hash(self):
+        return '%s_d%s' % ('AB', 'unfiled')
+
+    def get_info(self):
+        obj = {
+            'name': unicode(self.name),
+            'hash': self.get_hash(),
+            'phash': '',
+            'mime': 'directory',
+            'read': 1,
+            'write': 0,
+            'size': 0,
+            'dirs': int(File.objects.filter(folder__isnull=True).exists()),
+            'volume_id': 'AB',
+            'locked': 1
+        }
+        return obj
+
+    def get_children(self):
+        return self.children
+
+    def get_ancestors(self, ascending=False, include_self=False):
+        if include_self:
+            return [self]
+        return []
+
+    def get_siblings(self, include_self=False):
+        if include_self:
+            return [self]
+        return []
+
 
 class ImagesWithMissingData(DummyFolder):
     name = _("files with missing metadata")
@@ -93,3 +124,34 @@ class FolderRoot(DummyFolder):
 
     def get_admin_directory_listing_url_path(self):
         return urlresolvers.reverse('admin:filer-directory_listing-root')
+
+    def get_hash(self):
+        return '%s_d%s' % ('AA', 'root')
+
+    def get_info(self):
+        obj = {
+            'name': unicode(self.name),
+            'hash': self.get_hash(),
+            'phash': '',
+            'mime': 'directory',
+            'read': 1,
+            'write': 0,
+            'size': 0,
+            'dirs': int(Folder.objects.filter(parent__isnull=True).exists()),
+            'volume_id': 'AA',
+            'locked': 1
+        }
+        return obj
+
+    def get_children(self):
+        return self.children
+
+    def get_ancestors(self, ascending=False, include_self=False):
+        if include_self:
+            return [self]
+        return []
+
+    def get_siblings(self, include_self=False):
+        if include_self:
+            return [self]
+        return []

@@ -6,6 +6,7 @@ from filer.admin.folderadmin import FolderAdmin
 from filer.admin.imageadmin import ImageAdmin
 from filer.admin.permissionadmin import PermissionAdmin
 from filer.models import FolderPermission, Folder, File, Clipboard, Image
+from filer.admin.elfinderadmin import ElFinderAdmin, ElFinder
 
 
 admin.site.register(Folder, FolderAdmin)
@@ -13,3 +14,4 @@ admin.site.register(File, FileAdmin)
 admin.site.register(Clipboard, ClipboardAdmin)
 admin.site.register(Image, ImageAdmin)
 admin.site.register(FolderPermission, PermissionAdmin)
+admin.site.register(ElFinder, ElFinderAdmin)

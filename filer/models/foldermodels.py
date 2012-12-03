@@ -213,6 +213,29 @@ class Folder(models.Model, mixins.IconsMixin):
         verbose_name = _("Folder")
         verbose_name_plural = _("Folders")
 
+    def get_hash(self):
+        return 'AA_d%s' % self.id
+
+    def get_parent_hash(self):
+        if self.parent:
+            return self.parent.get_hash()
+        else:
+            from filer.models.virtualitems import FolderRoot
+            return FolderRoot().get_hash()
+
+    def get_info(self):
+        obj = {
+            'name': unicode(self.name),
+            'hash': self.get_hash(),
+            'phash': self.get_parent_hash(),
+            'mime': 'directory',
+            'read': 1,
+            'write': 0,
+            'size': 0,
+            'dirs': int(bool(self.children_count)),
+        }
+        return obj
+
 # MPTT registration
 try:
     mptt.register(Folder)

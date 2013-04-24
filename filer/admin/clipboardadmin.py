@@ -81,6 +81,8 @@ class ClipboardAdmin(admin.ModelAdmin):
                 # Enforce the FILER_IS_PUBLIC_DEFAULT
                 file_obj.is_public = filer_settings.FILER_IS_PUBLIC_DEFAULT
                 file_obj.save()
+                # workaround for starage backends that consume the file object when uploading and don't seek(0) after
+                file_obj.file.seek(0)
                 clipboard_item = ClipboardItem(
                                     clipboard=clipboard, file=file_obj)
                 clipboard_item.save()

@@ -1,5 +1,6 @@
 #-*- coding: utf-8 -*-
 from django.contrib.auth import models as auth_models
+from django.contrib.auth.models import AnonymousUser
 from django.db import models
 from django.db.models import Q
 from django.utils.translation import ugettext as _
@@ -240,17 +241,18 @@ class PermissionSet(object):
         """
         if not isinstance(user, PermissionUser):
             user = PermissionUser(user)
+        if not self.all and user.is_anonymous:
+            return False
         if user.is_superuser:
             return True
-        if self.all:
-            return True
-        if not user.is_authenticated:
-            return False
         deny_by_user = user.id in self.deny_user_ids
         deny_by_group = bool(user.group_ids & self.deny_group_ids)
         if not deny_by_user and user.id in self.allow_user_ids:
             return True
         if not deny_by_user and not deny_by_group and user.group_ids & self.allow_group_ids:
+            return True
+        if self.all and not (deny_by_user or deny_by_group):
+            # all check is last, because explicit denies are stronger than implicit allow all
             return True
         return False
 
@@ -393,6 +395,8 @@ class PermissionUser(object):
     Provides necessary attributes of a User when using it to check for permissions.
     """
     def __init__(self, user):
+        if user is None:
+            user = AnonymousUser()
         self.id = user.pk
         cache_key = '_filer_permissionuser_hacky_cached_group_ids'
         group_ids = getattr(user, cache_key, None)
@@ -401,7 +405,7 @@ class PermissionUser(object):
             setattr(user, cache_key, group_ids.copy())
         self.group_ids = group_ids
         self.is_superuser = user.is_superuser
-        self.is_authenticated = user.is_authenticated()
+        self.is_anonymous = user.is_anonymous()
 
         # not used yet
         self.is_staff = user.is_staff

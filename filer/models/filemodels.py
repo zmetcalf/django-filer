@@ -12,6 +12,7 @@ from filer import settings as filer_settings
 from filer.models.foldermodels import Folder
 from filer.utils.compatibility import python_2_unicode_compatible
 from polymorphic import PolymorphicModel, PolymorphicManager
+import django
 import hashlib
 import os
 
@@ -216,9 +217,13 @@ class File(PolymorphicModel, mixins.IconsMixin):
         return text
 
     def get_admin_url_path(self):
+        if django.VERSION < (1, 7):
+            module_name = self._meta.module_name
+        else:
+            module_name = self._meta.model_name
         return urlresolvers.reverse(
             'admin:%s_%s_change' % (self._meta.app_label,
-                                    self._meta.module_name,),
+                                    module_name,),
             args=(self.pk,)
         )
 

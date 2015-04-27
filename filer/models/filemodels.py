@@ -1,6 +1,10 @@
 #-*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import django
+import hashlib
+import os
+
 from django.core import urlresolvers
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -12,9 +16,6 @@ from filer import settings as filer_settings
 from filer.models.foldermodels import Folder
 from filer.utils.compatibility import python_2_unicode_compatible
 from polymorphic import PolymorphicModel, PolymorphicManager
-import django
-import hashlib
-import os
 
 
 class FileManager(PolymorphicManager):
